@@ -482,7 +482,7 @@ local function CreateWaypoint()
     
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "Waypoint Created",
-        Text = "Point " .. waypointNumber .. " created!",
+        Text = "Point " ... waypointNumber .. " created!",
         Duration = 2
     })
 end
@@ -544,7 +544,7 @@ local function CreateFlyWaypoint()
     
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "Fly Waypoint Created",
-        Text = "Point " .. waypointNumber .. " (Fly) created!",
+        Text = "Point " ... waypointNumber .. " (Fly) created!",
         Duration = 2
     })
 end
@@ -635,7 +635,7 @@ local function CreateAfkWaypoint()
     
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "AFK Waypoint Created",
-        Text = "Point " .. waypointNumber .. " (AFK 2s) created!",
+        Text = "Point " ... waypointNumber .. " (AFK 2s) created!",
         Duration = 2
     })
 end
@@ -837,14 +837,14 @@ CreateButton("Start Waypoints Movement", function()
                                 RemoveBodyVelocity() -- Останавливаем движение
                                 game:GetService("StarterGui"):SetCore("SendNotification", {
                                     Title = "BoogaX",
-                                    Text = "Waiting " .. waitTime .. " seconds...",
+                                    Text = "Waiting " ... waitTime .. " seconds...",
                                     Duration = 3
                                 })
                                 
                                 -- Ждём с обратным отсчётом
                                 for countdown = waitTime, 1, -1 do
                                     if not WAYPOINTS_MOVING then break end
-                                    print("⏱️ Waiting at waypoint " .. (currentWaypoint:GetAttribute("WaypointNumber") or "?") .. ": " .. countdown .. "s remaining")
+                                    print("⏱️ Waiting at waypoint " ... (currentWaypoint:GetAttribute("WaypointNumber") or "?") .. ": " ... countdown .. "s remaining")
                                     task.wait(1)
                                 end
                                 
@@ -871,7 +871,7 @@ CreateButton("Start Waypoints Movement", function()
                                 -- Ждём с обратным отсчётом (улучшенная версия)
                                 for countdown = AFK_WAIT_TIME, 1, -1 do
                                     if not WAYPOINTS_MOVING then break end
-                                    print("⏱️ AFK at waypoint " .. (currentWaypoint:GetAttribute("WaypointNumber") or "?") .. ": " .. countdown .. "s remaining")
+                                    print("⏱️ AFK at waypoint " ... (currentWaypoint:GetAttribute("WaypointNumber") or "?") .. ": " ... countdown .. "s remaining")
                                     
                                     -- Удерживаем персонажа на месте во время ожидания
                                     if humanoid and rootPart then
@@ -956,7 +956,7 @@ CreateButton("Delete 1 Waypoint", function()
         
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "BoogaX",
-            Text = "Deleted waypoint #" .. waypointNumber .. " (" .. waypointType .. ")",
+            Text = "Deleted waypoint #" ... waypointNumber .. " (" ... waypointType .. ")",
             Duration = 2
         })
     end
@@ -1408,7 +1408,7 @@ local function StartGoldFarm()
 	-- Используем встроенные координаты
 	game:GetService("StarterGui"):SetCore("SendNotification", {
 		Title = "BoogaX",
-		Text = "💰 Gold Farm Started!\n✅ Following " .. #GOLD_FARM_COORDINATES .. " waypoints",
+		Text = "💰 Gold Farm Started!\n✅ Following " ... #GOLD_FARM_COORDINATES .. " waypoints",
 		Duration = 3
 	})
 	
@@ -1641,9 +1641,9 @@ local function ParseJSONCoordinates()
 	end)
 	
 	if success and jsonData and jsonData.position then
-		print("✅ Successfully parsed JSON coordinates: " .. #jsonData.position .. " positions")
-		print("📊 Types count: " .. (jsonData.types and #jsonData.types or 0))
-		print("📊 Waits count: " .. (jsonData.waits and #jsonData.waits or 0))
+		print("✅ Successfully parsed JSON coordinates: " ... #jsonData.position .. " positions")
+		print("📊 Types count: " ... (jsonData.types and #jsonData.types or 0))
+		print("📊 Waits count: " ... (jsonData.waits and #jsonData.waits or 0))
 		
 		local afkCount = 0
 		for i, pos in ipairs(jsonData.position) do
@@ -1659,7 +1659,7 @@ local function ParseJSONCoordinates()
 				table.insert(waits, jsonData.waits and jsonData.waits[i] or 0)
 			end
 		end
-		print("✅ Found " .. afkCount .. " AFK waypoints")
+		print("✅ Found " ... afkCount .. " AFK waypoints")
 	else
 		print("⚠️ Failed to parse JSON, using old coordinates")
 		-- Используем старые координаты
@@ -1697,7 +1697,7 @@ local function StartFastGoldFarm()
 	local waypointsCount = #WAYPOINTS_HOLDER:GetChildren()
 	
 	if waypointsCount > 0 then
-		print("📍 Found " .. waypointsCount .. " total waypoints")
+		print("📍 Found " ... waypointsCount .. " total waypoints")
 		local waypoints = WAYPOINTS_HOLDER:GetChildren()
 		table.sort(waypoints, function(a, b)
 			return (a:GetAttribute("WaypointNumber") or 0) < (b:GetAttribute("WaypointNumber") or 0)
@@ -1713,7 +1713,7 @@ local function StartFastGoldFarm()
 				print(string.format("  WP #%d: Type=%s, Pos=(%.1f, %.1f, %.1f)", wpNum, wpType, waypoint.Position.X, waypoint.Position.Y, waypoint.Position.Z))
 			end
 		end
-		print("📍 Using " .. #positions .. " waypoints for fast gold farm")
+		print("📍 Using " ... #positions .. " waypoints for fast gold farm")
 	else
 		print("📍 Parsing JSON coordinates...")
 		positions, waypointTypes, waypointWaits = ParseJSONCoordinates()
@@ -1723,7 +1723,7 @@ local function StartFastGoldFarm()
 		end
 	end
 	
-	print("✅ Parsed " .. #positions .. " positions for fast gold farm")
+	print("✅ Parsed " ... #positions .. " positions for fast gold farm")
 	
 	if #positions == 0 then
 		print("❌ No valid positions found!")
@@ -1744,7 +1744,7 @@ local function StartFastGoldFarm()
 		for i, pos in ipairs(positions) do
 			local wpType = waypointTypes[i] or "fly"
 			local marker = Instance.new("Part")
-			marker.Name = "FastFarmMarker_" .. i
+			marker.Name = "FastFarmMarker_" ... i
 			marker.Size = Vector3.new(1.2, 1.2, 1.2) -- Уменьшенный размер куба
 			marker.Shape = Enum.PartType.Block -- Кубическая форма
 			marker.Position = pos
@@ -1791,7 +1791,7 @@ local function StartFastGoldFarm()
 			table.insert(FAST_GOLD_FARM_MARKERS, marker)
 		end
 		
-		print("✅ Created " .. #FAST_GOLD_FARM_MARKERS .. " visual markers for route")
+		print("✅ Created " ... #FAST_GOLD_FARM_MARKERS .. " visual markers for route")
 	end
 	
 	-- НЕМЕДЛЕННО начинаем лететь к первой координате (ДО task.spawn)
@@ -1799,7 +1799,7 @@ local function StartFastGoldFarm()
 	if char and char:FindFirstChild("HumanoidRootPart") then
 		local rootPart = char.HumanoidRootPart
 		local firstPos = positions[1]
-		print("🚀 Flying to first coordinate: " .. tostring(firstPos))
+		print("🚀 Flying to first coordinate: " ... tostring(firstPos))
 		
 		-- Создаем BodyVelocity для немедленного полета
 		local bodyVel = CreateBodyVelocity(rootPart)
@@ -1963,7 +1963,7 @@ local function StartFastGoldFarm()
 					cachedGoldList = FindAllGoldInRange()
 					lastSearchTime = currentTime
 					if #cachedGoldList > 0 then
-						print("🔍 Fast Gold Farm: Found " .. #cachedGoldList .. " gold ores nearby")
+						print("🔍 Fast Gold Farm: Found " ... #cachedGoldList .. " gold ores nearby")
 					end
 				end
 				
@@ -1976,7 +1976,7 @@ local function StartFastGoldFarm()
 					
 					local brokenCount = BreakMultipleGold(entityIDs)
 					if brokenCount > 0 then
-						print("⛏️ Fast Gold Farm: Hit " .. brokenCount .. " gold ores")
+						print("⛏️ Fast Gold Farm: Hit " ... brokenCount .. " gold ores")
 					end
 					
 					lastBreakTime = currentTime
@@ -1986,7 +1986,7 @@ local function StartFastGoldFarm()
 				if (currentTime - lastPickupTime) >= pickupCooldown then
 					local collected = CollectRawGold()
 					if collected > 0 then
-						print("💰 Fast Gold Farm: Collected " .. collected .. " raw gold")
+						print("💰 Fast Gold Farm: Collected " ... collected .. " raw gold")
 					end
 					lastPickupTime = currentTime
 				end
@@ -2020,7 +2020,7 @@ local function StartFastGoldFarm()
 						-- Останавливаем движение
 						RemoveBodyVelocity()
 						
-						print("⏸️ AFK waypoint reached! Distance: " .. math.floor(distance) .. " | Waiting 2 seconds...")
+						print("⏸️ AFK waypoint reached! Distance: " ... math.floor(distance) .. " | Waiting 2 seconds...")
 						game:GetService("StarterGui"):SetCore("SendNotification", {
 							Title = "Fast Gold Farm",
 							Text = "AFK point - waiting 2s",
@@ -2038,7 +2038,7 @@ local function StartFastGoldFarm()
 								cachedGoldList = FindAllGoldInRange()
 								lastSearchTime = afkCurrentTime
 								if #cachedGoldList > 0 then
-									print("🔍 AFK: Found " .. #cachedGoldList .. " gold ores")
+									print("🔍 AFK: Found " ... #cachedGoldList .. " gold ores")
 								end
 							end
 							
@@ -2051,7 +2051,7 @@ local function StartFastGoldFarm()
 								
 								local brokenCount = BreakMultipleGold(entityIDs)
 								if brokenCount > 0 then
-									print("⛏️ AFK: Hit " .. brokenCount .. " gold ores")
+									print("⛏️ AFK: Hit " ... brokenCount .. " gold ores")
 								end
 								
 								lastBreakTime = afkCurrentTime
@@ -2061,7 +2061,7 @@ local function StartFastGoldFarm()
 							if (afkCurrentTime - lastPickupTime) >= pickupCooldown then
 								local collected = CollectRawGold()
 								if collected > 0 then
-									print("💰 AFK: Collected " .. collected .. " raw gold")
+									print("💰 AFK: Collected " ... collected .. " raw gold")
 								end
 								lastPickupTime = afkCurrentTime
 							end
@@ -2198,7 +2198,7 @@ local function ShowFastFarmMarkers()
 	for i, pos in ipairs(positions) do
 		local wpType = waypointTypes[i] or "fly"
 		local marker = Instance.new("Part")
-		marker.Name = "FastFarmMarker_" .. i
+		marker.Name = "FastFarmMarker_" ... i
 		marker.Size = Vector3.new(1.2, 1.2, 1.2) -- Уменьшенный размер куба
 		marker.Shape = Enum.PartType.Block -- Кубическая форма
 		marker.Position = pos
@@ -2243,7 +2243,7 @@ local function ShowFastFarmMarkers()
 		table.insert(FAST_GOLD_FARM_MARKERS, marker)
 	end
 	
-	print("✅ Showing " .. #FAST_GOLD_FARM_MARKERS .. " route markers")
+	print("✅ Showing " ... #FAST_GOLD_FARM_MARKERS .. " route markers")
 end
 
 -- Функция для скрытия маркеров
@@ -2272,10 +2272,10 @@ local FastFarmSpeedInput = Tabs.AutoFarm:AddInput("FastFarmSpeedInput", {
 			FAST_GOLD_FARM_SPEED = speed
 			game:GetService("StarterGui"):SetCore("SendNotification", {
 				Title = "Fast Farm Gold",
-				Text = "Speed set to " .. speed,
+				Text = "Speed set to " ... speed,
 				Duration = 2
 			})
-			print("✅ Fast Farm Gold speed set to: " .. speed)
+			print("✅ Fast Farm Gold speed set to: " ... speed)
 		else
 			game:GetService("StarterGui"):SetCore("SendNotification", {
 				Title = "Fast Farm Gold",
@@ -2489,7 +2489,7 @@ local function StartAutoBreak()
 					
 					local brokenCount = BreakMultipleGold(entityIDs)
 					if brokenCount > 0 then
-						print("⛏️ Auto Break: Hit " .. brokenCount .. " gold ores")
+						print("⛏️ Auto Break: Hit " ... brokenCount .. " gold ores")
 					end
 					
 					lastBreakTime = currentTime
@@ -2499,7 +2499,7 @@ local function StartAutoBreak()
 				if (currentTime - lastPickupTime) >= pickupCooldown then
 					local collected = CollectRawGold()
 					if collected > 0 then
-						print("💰 Auto Break: Collected " .. collected .. " raw gold")
+						print("💰 Auto Break: Collected " ... collected .. " raw gold")
 					end
 					lastPickupTime = currentTime
 				end
@@ -2540,7 +2540,7 @@ end, Tabs.AutoFarm)
 function LoadCoordinatesFromText(coordsText)
     -- УЛУЧШЕННАЯ ОЧИСТКА ТЕКСТА (для файлов с телефона)
     print("\n=== CLEANING TEXT ===")
-    print("Raw length: " .. string.len(coordsText))
+    print("Raw length: " ... string.len(coordsText))
     
     -- Убираем BOM (Byte Order Mark) если есть
     coordsText = coordsText:gsub("^\239\187\191", "") -- UTF-8 BOM
@@ -2557,7 +2557,7 @@ function LoadCoordinatesFromText(coordsText)
             if cleanedText == "" then
                 cleanedText = trimmedLine
             else
-                cleanedText = cleanedText .. "\n" .. trimmedLine
+                cleanedText = cleanedText .. "\n" ... trimmedLine
             end
         end
     end
@@ -2567,7 +2567,7 @@ function LoadCoordinatesFromText(coordsText)
         coordsText = cleanedText
     end
     
-    print("Cleaned length: " .. string.len(coordsText))
+    print("Cleaned length: " ... string.len(coordsText))
     
     -- Очищаем старые точки
     WAYPOINTS_MOVING = false
@@ -2605,11 +2605,11 @@ function LoadCoordinatesFromText(coordsText)
     local hasBrace = string.find(coordsText, "{", 1, true) ~= nil
     local hasBracket = string.find(coordsText, "[", 1, true) ~= nil
     
-    print("  Has 'position': " .. tostring(hasPosition))
-    print("  Has 'wait': " .. tostring(hasWait))
-    print("  Has 'positions': " .. tostring(hasPositions))
-    print("  Has '{': " .. tostring(hasBrace))
-    print("  Has '[': " .. tostring(hasBracket))
+    print("  Has 'position': " ... tostring(hasPosition))
+    print("  Has 'wait': " ... tostring(hasWait))
+    print("  Has 'positions': " ... tostring(hasPositions))
+    print("  Has '{': " ... tostring(hasBrace))
+    print("  Has '[': " ... tostring(hasBracket))
     
     -- Проверяем wait формат первым (приоритет)
     if hasWait and hasPositions and hasBrace and hasBracket then
@@ -2618,18 +2618,18 @@ function LoadCoordinatesFromText(coordsText)
             return game:GetService("HttpService"):JSONDecode(coordsText)
         end)
         
-        print("JSON decode success: " .. tostring(success))
+        print("JSON decode success: " ... tostring(success))
         
         if success and decoded and decoded.wait and decoded.positions then
             print("✓ Wait format detected!")
-            print("  Wait array length: " .. #decoded.wait)
-            print("  Positions array length: " .. #decoded.positions)
+            print("  Wait array length: " ... #decoded.wait)
+            print("  Positions array length: " ... #decoded.positions)
             
             -- Проверяем, что массивы одинаковой длины
             if #decoded.wait ~= #decoded.positions then
                 print("⚠️ WARNING: wait and positions arrays have different lengths!")
-                print("  wait: " .. #decoded.wait .. ", positions: " .. #decoded.positions)
-                print("  Will use minimum length: " .. math.min(#decoded.wait, #decoded.positions))
+                print("  wait: " ... #decoded.wait .. ", positions: " ... #decoded.positions)
+                print("  Will use minimum length: " ... math.min(#decoded.wait, #decoded.positions))
             end
             
             local minLength = math.min(#decoded.wait, #decoded.positions)
@@ -2638,7 +2638,7 @@ function LoadCoordinatesFromText(coordsText)
                 local waitTime = decoded.wait[i]
                 local posString = decoded.positions[i]
                 
-                print("  Processing [" .. i .. "]: wait=" .. tostring(waitTime) .. ", pos=" .. tostring(posString))
+                print("  Processing [" ... i .. "]: wait=" ... tostring(waitTime) .. ", pos=" ... tostring(posString))
                 
                 -- Парсим строку позиции "X,Y,Z"
                 local coords = {}
@@ -2652,9 +2652,9 @@ function LoadCoordinatesFromText(coordsText)
                 if #coords == 3 then
                     -- Добавляем позицию с wait временем
                     table.insert(positions, {coords[1], coords[2], coords[3], waitTime})
-                    print("    ✅ Added position with wait: " .. coords[1] .. ", " .. coords[2] .. ", " .. coords[3] .. " (wait: " .. waitTime .. "s)")
+                    print("    ✅ Added position with wait: " ... coords[1] .. ", " ... coords[2] .. ", " ... coords[3] .. " (wait: " ... waitTime .. "s)")
                 else
-                    print("    ⚠️ Skipped invalid position (expected 3 coords, got " .. #coords .. ")")
+                    print("    ⚠️ Skipped invalid position (expected 3 coords, got " ... #coords .. ")")
                 end
             end
         else
@@ -2663,12 +2663,12 @@ function LoadCoordinatesFromText(coordsText)
     elseif hasPosition or (hasBrace and hasBracket) then
         -- JSON формат (стандартный)
         print("=== Trying JSON format ===")
-        print("First 200 chars: " .. string.sub(coordsText, 1, 200))
-        print("Last 100 chars: " .. string.sub(coordsText, -100))
+        print("First 200 chars: " ... string.sub(coordsText, 1, 200))
+        print("Last 100 chars: " ... string.sub(coordsText, -100))
         
         -- ИСПРАВЛЕНИЕ: Проверяем что JSON полный (не обрезан)
         local jsonComplete = coordsText:match("}%s*$") ~= nil
-        print("JSON appears complete: " .. tostring(jsonComplete))
+        print("JSON appears complete: " ... tostring(jsonComplete))
         
         if not jsonComplete then
             print("⚠️ WARNING: JSON appears truncated! Trying to fix...")
@@ -2679,8 +2679,8 @@ function LoadCoordinatesFromText(coordsText)
             local openBraces = select(2, coordsText:gsub("{", ""))
             local closeBraces = select(2, coordsText:gsub("}", ""))
             
-            print("  Brackets: [ = " .. openBrackets .. ", ] = " .. closeBrackets)
-            print("  Braces: { = " .. openBraces .. ", } = " .. closeBraces)
+            print("  Brackets: [ = " ... openBrackets .. ", ] = " ... closeBrackets)
+            print("  Braces: { = " ... openBraces .. ", } = " ... closeBraces)
             
             -- Закрываем недостающие скобки в правильном порядке
             local missingBrackets = openBrackets - closeBrackets
@@ -2690,54 +2690,54 @@ function LoadCoordinatesFromText(coordsText)
                 for i = 1, missingBrackets do
                     coordsText = coordsText .. "]"
                 end
-                print("  Added " .. missingBrackets .. " closing bracket(s) ]")
+                print("  Added " ... missingBrackets .. " closing bracket(s) ]")
             end
             
             if missingBraces > 0 then
                 for i = 1, missingBraces do
                     coordsText = coordsText .. "}"
                 end
-                print("  Added " .. missingBraces .. " closing brace(s) }")
+                print("  Added " ... missingBraces .. " closing brace(s) }")
             end
             
-            print("Fixed JSON last 100 chars: " .. string.sub(coordsText, -100))
+            print("Fixed JSON last 100 chars: " ... string.sub(coordsText, -100))
         end
         
         local success, decoded = pcall(function()
             return game:GetService("HttpService"):JSONDecode(coordsText)
         end)
         
-        print("JSON decode success: " .. tostring(success))
+        print("JSON decode success: " ... tostring(success))
         
         if success and decoded then
-            print("Decoded type: " .. type(decoded))
+            print("Decoded type: " ... type(decoded))
             local keys = {}
             for k, v in pairs(decoded) do
                 table.insert(keys, tostring(k))
             end
-            print("Decoded keys: " .. table.concat(keys, ", "))
+            print("Decoded keys: " ... table.concat(keys, ", "))
             
             if decoded.position then
                 print("✓ JSON decoded successfully, found 'position' array")
-                print("  Array length: " .. #decoded.position)
-                print("  Array type: " .. type(decoded.position))
+                print("  Array length: " ... #decoded.position)
+                print("  Array type: " ... type(decoded.position))
                 
                 -- Проверяем наличие массивов types и waits
                 local hasTypes = decoded.types and type(decoded.types) == "table"
                 local hasWaits = decoded.waits and type(decoded.waits) == "table"
                 
-                print("  Has types array: " .. tostring(hasTypes))
-                print("  Has waits array: " .. tostring(hasWaits))
+                print("  Has types array: " ... tostring(hasTypes))
+                print("  Has waits array: " ... tostring(hasWaits))
                 
                 for i, pos in ipairs(decoded.position) do
-                    print("  Processing element " .. i .. ": type=" .. type(pos))
+                    print("  Processing element " ... i .. ": type=" ... type(pos))
                     
                     if type(pos) == "table" then
                         local posKeys = {}
                         for k, v in pairs(pos) do
-                            table.insert(posKeys, tostring(k) .. "=" .. tostring(v))
+                            table.insert(posKeys, tostring(k) .. "=" ... tostring(v))
                         end
-                        print("    Keys: " .. table.concat(posKeys, ", "))
+                        print("    Keys: " ... table.concat(posKeys, ", "))
                         
                         -- ИСПРАВЛЕНИЕ: проверяем разные варианты ключей
                         local x = pos.X or pos.x or pos["X"] or pos["x"]
@@ -2750,25 +2750,25 @@ function LoadCoordinatesFromText(coordsText)
                             local wpType = hasTypes and decoded.types[i] or "walk"
                             
                             table.insert(positions, {x, y, z, waitTime, wpType})
-                            print("    ✅ Added position: " .. x .. ", " .. y .. ", " .. z .. " (type: " .. wpType .. ", wait: " .. waitTime .. "s)")
+                            print("    ✅ Added position: " ... x .. ", " ... y .. ", " ... z .. " (type: " ... wpType .. ", wait: " ... waitTime .. "s)")
                         else
-                            print("    ⚠️ Skipped table without X/Y/Z (x=" .. tostring(x) .. ", y=" .. tostring(y) .. ", z=" .. tostring(z) .. ")")
+                            print("    ⚠️ Skipped table without X/Y/Z (x=" ... tostring(x) .. ", y=" ... tostring(y) .. ", z=" ... tostring(z) .. ")")
                         end
                     else
-                        print("    ⚠️ Skipped non-table element: " .. tostring(pos))
+                        print("    ⚠️ Skipped non-table element: " ... tostring(pos))
                     end
                 end
             else
                 print("✗ JSON decoded but no 'position' field found")
                 print("Available fields:")
                 for k, v in pairs(decoded) do
-                    print("  " .. tostring(k) .. " = " .. tostring(v))
+                    print("  " ... tostring(k) .. " = " ... tostring(v))
                 end
             end
         else
             print("✗ JSON decode failed")
-            print("Error: " .. tostring(decoded))
-            print("Text length: " .. string.len(coordsText))
+            print("Error: " ... tostring(decoded))
+            print("Text length: " ... string.len(coordsText))
             print("First 500 chars:")
             print(string.sub(coordsText, 1, 500))
         end
@@ -2782,12 +2782,12 @@ function LoadCoordinatesFromText(coordsText)
         local lineCount = 0
         for line in string.gmatch(coordsText, "[^\n]+") do
             lineCount = lineCount + 1
-            print("  Line " .. lineCount .. ": " .. string.sub(line, 1, 50))
+            print("  Line " ... lineCount .. ": " ... string.sub(line, 1, 50))
             for coordSet in string.gmatch(line, "([^;]+)") do
                 local trimmed = coordSet:match("^%s*(.-)%s*$")
                 if trimmed and trimmed ~= "" then
                     table.insert(allCoordSets, trimmed)
-                    print("    Found coord set: " .. string.sub(trimmed, 1, 50))
+                    print("    Found coord set: " ... string.sub(trimmed, 1, 50))
                 end
             end
         end
@@ -2798,12 +2798,12 @@ function LoadCoordinatesFromText(coordsText)
                 local trimmed = coordSet:match("^%s*(.-)%s*$")
                 if trimmed and trimmed ~= "" then
                     table.insert(allCoordSets, trimmed)
-                    print("  Found coord set: " .. string.sub(trimmed, 1, 50))
+                    print("  Found coord set: " ... string.sub(trimmed, 1, 50))
                 end
             end
         end
         
-        print("Total coord sets found: " .. #allCoordSets)
+        print("Total coord sets found: " ... #allCoordSets)
         
         for i, coordSet in ipairs(allCoordSets) do
             local coords = {}
@@ -2814,22 +2814,22 @@ function LoadCoordinatesFromText(coordsText)
                 end
             end
             
-            print("  Set " .. i .. ": found " .. #coords .. " numbers")
+            print("  Set " ... i .. ": found " ... #coords .. " numbers")
             
             if #coords == 3 then
                 table.insert(positions, coords)
-                print("    ✅ Added position: " .. coords[1] .. ", " .. coords[2] .. ", " .. coords[3])
+                print("    ✅ Added position: " ... coords[1] .. ", " ... coords[2] .. ", " ... coords[3])
             elseif #coords > 0 then
-                print("    ⚠️ Skipped invalid coords (expected 3, got " .. #coords .. ")")
+                print("    ⚠️ Skipped invalid coords (expected 3, got " ... #coords .. ")")
             end
         end
         
-        print("Total positions parsed: " .. #positions)
+        print("Total positions parsed: " ... #positions)
     end
     
     -- Проверяем результат
     print("\n=== FINAL CHECK ===")
-    print("Total positions loaded: " .. #positions)
+    print("Total positions loaded: " ... #positions)
     
     if #positions == 0 then
         print("\n❌ NO VALID COORDINATES FOUND!")
@@ -2854,10 +2854,10 @@ function LoadCoordinatesFromText(coordsText)
     local batchSize = 30 -- Оптимальный баланс: быстро и без лагов
     local batches = math.ceil(totalWaypoints / batchSize)
     
-    print("Total waypoints: " .. totalWaypoints)
-    print("Batch size: " .. batchSize .. " (balanced)")
-    print("Total batches: " .. batches)
-    print("Estimated time: ~" .. math.ceil(batches * 0.05) .. " seconds")
+    print("Total waypoints: " ... totalWaypoints)
+    print("Batch size: " ... batchSize .. " (balanced)")
+    print("Total batches: " ... batches)
+    print("Estimated time: ~" ... math.ceil(batches * 0.05) .. " seconds")
     
     -- Создаём точки асинхронно
     task.spawn(function()
@@ -2870,11 +2870,11 @@ function LoadCoordinatesFromText(coordsText)
             -- Показываем прогресс каждые 5 батчей (чаще)
             if batchNum % 5 == 0 or batchNum == 1 or batchNum == batches then
                 local progress = math.floor((batchNum / batches) * 100)
-                print("📦 " .. progress .. "% (" .. endIdx .. "/" .. totalWaypoints .. ")")
+                print("📦 " ... progress .. "% (" ... endIdx .. "/" ... totalWaypoints .. ")")
                 
                 game:GetService("StarterGui"):SetCore("SendNotification", {
                     Title = "BoogaX",
-                    Text = "Loading: " .. progress .. "% (" .. endIdx .. "/" .. totalWaypoints .. ")",
+                    Text = "Loading: " ... progress .. "% (" ... endIdx .. "/" ... totalWaypoints .. ")",
                     Duration = 0.3
                 })
             end
@@ -2993,7 +2993,7 @@ function LoadCoordinatesFromText(coordsText)
                         
                         -- Текст зависит от типа
                         if waitTime and waitTime > 0 then
-                            numberLabel.Text = tostring(waypointNumber) .. "\n⏱" .. waitTime .. "s"
+                            numberLabel.Text = tostring(waypointNumber) .. "\n⏱" ... waitTime .. "s"
                             numberLabel.TextSize = 8
                         elseif wpType == "fly" then
                             numberLabel.Text = tostring(waypointNumber) .. "\n✈️"
@@ -3021,16 +3021,16 @@ function LoadCoordinatesFromText(coordsText)
         local elapsed = math.floor((tick() - startTime) * 10) / 10
         
         -- Финальное уведомление
-        print("\n" .. string.rep("=", 60))
+        print("\n" ... string.rep("=", 60))
         print("=== LOAD COMPLETE ===")
-        print("✅ Successfully loaded " .. loadedCount .. " waypoints!")
-        print("⏱️  Loading time: " .. elapsed .. " seconds")
-        print("Total waypoints in holder: " .. #WAYPOINTS_HOLDER:GetChildren())
+        print("✅ Successfully loaded " ... loadedCount .. " waypoints!")
+        print("⏱️  Loading time: " ... elapsed .. " seconds")
+        print("Total waypoints in holder: " ... #WAYPOINTS_HOLDER:GetChildren())
         print(string.rep("=", 60) .. "\n")
         
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "BoogaX",
-            Text = "✅ " .. loadedCount .. " waypoints loaded in " .. elapsed .. "s!\nReady to start!",
+            Text = "✅ " ... loadedCount .. " waypoints loaded in " ... elapsed .. "s!\nReady to start!",
             Duration = 4
         })
     end)
@@ -3058,7 +3058,7 @@ end, Tabs.Coordinates)
 
 -- СТАРАЯ ФУНКЦИЯ: Загрузка из буфера обмена (решает проблему обрезки)
 CreateButton("  CLoad from Clipboard", function()
-    print("\n" .. string.rep("=", 60))
+    print("\n" ... string.rep("=", 60))
     print("=== LOADING FROM CLIPBOARD ===")
     
     local clipboardText = ""
@@ -3085,8 +3085,8 @@ CreateButton("  CLoad from Clipboard", function()
     
     if not clipboardSuccess or not clipboardText or clipboardText == "" then
         print("❌ Failed to read clipboard!")
-        print("   getclipboard available: " .. tostring(getclipboard ~= nil))
-        print("   readclipboard available: " .. tostring(readclipboard ~= nil))
+        print("   getclipboard available: " ... tostring(getclipboard ~= nil))
+        print("   readclipboard available: " ... tostring(readclipboard ~= nil))
         
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "BoogaX",
@@ -3097,14 +3097,14 @@ CreateButton("  CLoad from Clipboard", function()
     end
     
     print("✅ Clipboard read successfully!")
-    print("   Length: " .. string.len(clipboardText) .. " characters")
-    print("   First 200 chars: " .. string.sub(clipboardText, 1, 200))
-    print("   Last 100 chars: " .. string.sub(clipboardText, -100))
+    print("   Length: " ... string.len(clipboardText) .. " characters")
+    print("   First 200 chars: " ... string.sub(clipboardText, 1, 200))
+    print("   Last 100 chars: " ... string.sub(clipboardText, -100))
     print(string.rep("=", 60))
     
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "BoogaX",
-        Text = "📋 Loading " .. string.len(clipboardText) .. " chars from clipboard...",
+        Text = "📋 Loading " ... string.len(clipboardText) .. " chars from clipboard...",
         Duration = 3
     })
     
@@ -3114,37 +3114,37 @@ end, Tabs.Coordinates)
 
 -- Кнопка для проверки содержимого текстового поля (отладка)
 CreateButton("🔍 Check Text Box Content", function()
-    print("\n" .. string.rep("=", 60))
+    print("\n" ... string.rep("=", 60))
     print("=== TEXT BOX DEBUG ===")
     
     print("\n1. coordsTextBox object:")
-    print("   Exists: " .. tostring(coordsTextBox ~= nil))
+    print("   Exists: " ... tostring(coordsTextBox ~= nil))
     
     if coordsTextBox then
-        print("   Type: " .. type(coordsTextBox))
-        print("   Has .Value: " .. tostring(coordsTextBox.Value ~= nil))
-        print("   Has .Text: " .. tostring(coordsTextBox.Text ~= nil))
+        print("   Type: " ... type(coordsTextBox))
+        print("   Has .Value: " ... tostring(coordsTextBox.Value ~= nil))
+        print("   Has .Text: " ... tostring(coordsTextBox.Text ~= nil))
         
         if coordsTextBox.Value then
             local val = tostring(coordsTextBox.Value)
-            print("   .Value length: " .. string.len(val))
-            print("   .Value content (first 200): " .. string.sub(val, 1, 200))
+            print("   .Value length: " ... string.len(val))
+            print("   .Value content (first 200): " ... string.sub(val, 1, 200))
         end
     end
     
     print("\n2. Options table:")
-    print("   Exists: " .. tostring(Options ~= nil))
+    print("   Exists: " ... tostring(Options ~= nil))
     
     if Options then
         print("   Searching for coordinate-related keys...")
         for k, v in pairs(Options) do
             local keyLower = tostring(k):lower()
             if keyLower:match("coord") or keyLower:match("optional") then
-                print("   Found: '" .. tostring(k) .. "'")
+                print("   Found: '" ... tostring(k) .. "'")
                 if type(v) == "table" and v.Value then
                     local val = tostring(v.Value)
-                    print("     Value length: " .. string.len(val))
-                    print("     Value (first 200): " .. string.sub(val, 1, 200))
+                    print("     Value length: " ... string.len(val))
+                    print("     Value (first 200): " ... string.sub(val, 1, 200))
                 end
             end
         end
@@ -3171,26 +3171,26 @@ CreateButton("Load Coordinates", function()
     local fileFound = false
     local folderPath = "BoogaX"
     
-    print("\n" .. string.rep("=", 60))
+    print("\n" ... string.rep("=", 60))
     print("=== LOADING COORDINATES ===")
     
     -- Шаг 1: Проверяем доступность функций
     print("\n🔧 Checking available functions:")
-    print("  readfile: " .. tostring(readfile ~= nil))
-    print("  isfile: " .. tostring(isfile ~= nil))
-    print("  listfiles: " .. tostring(listfiles ~= nil))
-    print("  isfolder: " .. tostring(isfolder ~= nil))
-    print("  makefolder: " .. tostring(makefolder ~= nil))
+    print("  readfile: " ... tostring(readfile ~= nil))
+    print("  isfile: " ... tostring(isfile ~= nil))
+    print("  listfiles: " ... tostring(listfiles ~= nil))
+    print("  isfolder: " ... tostring(isfolder ~= nil))
+    print("  makefolder: " ... tostring(makefolder ~= nil))
     
     -- Шаг 2: Попробовать загрузить из файла
     if readfile then
         print("\n📁 Step 2: Trying to load from file...")
-        print("Folder path: " .. folderPath)
+        print("Folder path: " ... folderPath)
         
         -- Проверяем существует ли папка BoogaX
         if isfolder then
             local folderExists = isfolder(folderPath)
-            print("  Folder '" .. folderPath .. "' exists: " .. tostring(folderExists))
+            print("  Folder '" ... folderPath .. "' exists: " ... tostring(folderExists))
             
             if not folderExists and makefolder then
                 print("  Creating folder...")
@@ -3206,12 +3206,12 @@ CreateButton("Load Coordinates", function()
             end)
             
             if success and files then
-                print("  Found " .. #files .. " file(s):")
+                print("  Found " ... #files .. " file(s):")
                 for i, file in ipairs(files) do
-                    print("    [" .. i .. "] " .. tostring(file))
+                    print("    [" ... i .. "] " ... tostring(file))
                 end
             else
-                print("  ⚠️ Could not list files: " .. tostring(files))
+                print("  ⚠️ Could not list files: " ... tostring(files))
             end
         end
         
@@ -3229,12 +3229,12 @@ CreateButton("Load Coordinates", function()
         
         print("\n  🔍 Trying different file paths:")
         for i, filePath in ipairs(possiblePaths) do
-            print("  [" .. i .. "] Trying: " .. filePath)
+            print("  [" ... i .. "] Trying: " ... filePath)
             
             -- Проверяем существование файла
             if isfile then
                 local exists = isfile(filePath)
-                print("      isfile() = " .. tostring(exists))
+                print("      isfile() = " ... tostring(exists))
             end
             
             -- Пробуем прочитать
@@ -3246,12 +3246,12 @@ CreateButton("Load Coordinates", function()
                 coordsText = content
                 fileFound = true
                 print("      ✅ SUCCESS! File loaded!")
-                print("      Content length: " .. string.len(content))
-                print("      First 100 chars: " .. string.sub(content, 1, 100))
+                print("      Content length: " ... string.len(content))
+                print("      First 100 chars: " ... string.sub(content, 1, 100))
                 break
             else
                 if not success then
-                    print("      ❌ Error: " .. tostring(content))
+                    print("      ❌ Error: " ... tostring(content))
                 else
                     print("      ⚠️ Empty or not found")
                 end
@@ -3266,8 +3266,8 @@ CreateButton("Load Coordinates", function()
     -- Шаг 3: Если файл не найден, попробовать текстовое поле
     if not fileFound or coordsText == "" then
         print("\n📝 Step 3: Trying to load from text box...")
-        print("  coordsTextBox exists: " .. tostring(coordsTextBox ~= nil))
-        print("  Options exists: " .. tostring(Options ~= nil))
+        print("  coordsTextBox exists: " ... tostring(coordsTextBox ~= nil))
+        print("  Options exists: " ... tostring(Options ~= nil))
         
         local textBoxContent = ""
         
@@ -3278,12 +3278,12 @@ CreateButton("Load Coordinates", function()
             print("\n  Method 1: Direct coordsTextBox access")
             if coordsTextBox.Value then
                 textBoxContent = tostring(coordsTextBox.Value)
-                print("    coordsTextBox.Value: " .. string.len(textBoxContent) .. " chars")
+                print("    coordsTextBox.Value: " ... string.len(textBoxContent) .. " chars")
             end
             
             if textBoxContent == "" and coordsTextBox.Text then
                 textBoxContent = tostring(coordsTextBox.Text)
-                print("    coordsTextBox.Text: " .. string.len(textBoxContent) .. " chars")
+                print("    coordsTextBox.Text: " ... string.len(textBoxContent) .. " chars")
             end
         end
         
@@ -3298,10 +3298,10 @@ CreateButton("Load Coordinates", function()
                 for k, v in pairs(Options) do
                     count = count + 1
                     if count <= 10 then -- Показываем первые 10
-                        print("      - " .. tostring(k))
+                        print("      - " ... tostring(k))
                     end
                 end
-                print("    Total Options keys: " .. count)
+                print("    Total Options keys: " ... count)
             end
             
             -- Пробуем разные варианты имени
@@ -3315,10 +3315,10 @@ CreateButton("Load Coordinates", function()
             
             for _, key in ipairs(possibleKeys) do
                 if Options[key] then
-                    print("    Found Options['" .. key .. "']")
+                    print("    Found Options['" ... key .. "']")
                     if Options[key].Value then
                         textBoxContent = tostring(Options[key].Value)
-                        print("      Value: " .. string.len(textBoxContent) .. " chars")
+                        print("      Value: " ... string.len(textBoxContent) .. " chars")
                         if textBoxContent ~= "" then break end
                     end
                 end
@@ -3329,12 +3329,12 @@ CreateButton("Load Coordinates", function()
         if textBoxContent and textBoxContent ~= "" and textBoxContent ~= "Paste coordinates here if file not found" then
             coordsText = textBoxContent
             print("\n    ✅ Text box has content!")
-            print("    Content length: " .. string.len(coordsText))
-            print("    First 300 chars: " .. string.sub(coordsText, 1, 300))
-            print("    Last 100 chars: " .. string.sub(coordsText, -100))
+            print("    Content length: " ... string.len(coordsText))
+            print("    First 300 chars: " ... string.sub(coordsText, 1, 300))
+            print("    Last 100 chars: " ... string.sub(coordsText, -100))
         else
             print("\n    ⚠️ Text box is empty or contains placeholder")
-            print("    Content: '" .. tostring(textBoxContent) .. "'")
+            print("    Content: '" ... tostring(textBoxContent) .. "'")
         end
     end
     
@@ -3351,7 +3351,7 @@ CreateButton("Load Coordinates", function()
         print("\n📝 Tried files:")
         if readfile then
             for _, fileName in ipairs({"coordinates.txt", "coords.txt", "waypoints.txt", "points.txt"}) do
-                print("  - " .. folderPath .. "/" .. fileName)
+                print("  - " ... folderPath .. "/" ... fileName)
             end
         else
             print("  - readfile not available")
@@ -3427,7 +3427,7 @@ CreateButton("Save Coordinates (JSON)", function()
         if writefile then
             writefile(filePath, jsonText)
             fileSaved = true
-            print("✓ Coordinates saved to: " .. filePath)
+            print("✓ Coordinates saved to: " ... filePath)
         end
     end)
     
@@ -3456,15 +3456,15 @@ CreateButton("Save Coordinates (JSON)", function()
     end
     
     -- Показываем подробную информацию
-    print("\n" .. string.rep("=", 60))
+    print("\n" ... string.rep("=", 60))
     print("=== COORDINATES SAVED ===")
-    print("Total waypoints: " .. #waypoints)
-    print("JSON length: " .. string.len(jsonText) .. " characters")
-    print("File saved: " .. tostring(fileSaved))
-    print("Clipboard: " .. tostring(clipboardSuccess))
+    print("Total waypoints: " ... #waypoints)
+    print("JSON length: " ... string.len(jsonText) .. " characters")
+    print("File saved: " ... tostring(fileSaved))
+    print("Clipboard: " ... tostring(clipboardSuccess))
     
     if fileSaved then
-        print("File location: " .. filePath)
+        print("File location: " ... filePath)
     end
     
     print("\n📋 HOW TO LOAD:")
@@ -3480,7 +3480,7 @@ CreateButton("Save Coordinates (JSON)", function()
         message = "✅ Saved to file & clipboard!\n📋 Use 'Load from Clipboard' button to load"
         duration = 6
     elseif fileSaved then
-        message = "✅ Saved to file: " .. filePath
+        message = "✅ Saved to file: " ... filePath
     elseif clipboardSuccess then
         message = "✅ Copied to clipboard!\n📋 Use 'Load from Clipboard' button to load"
         duration = 6
@@ -3489,7 +3489,7 @@ CreateButton("Save Coordinates (JSON)", function()
     end
     
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "BoogaX - " .. #waypoints .. " waypoints",
+        Title = "BoogaX - " ... #waypoints .. " waypoints",
         Text = message,
         Duration = duration
     })
@@ -3604,7 +3604,7 @@ local function playAnimation()
         end
         
         local success, objects = pcall(function()
-            return game:GetObjects("rbxassetid://" .. animIdNum)
+            return game:GetObjects("rbxassetid://" ... animIdNum)
         end)
         
         if success and objects and #objects > 0 then
@@ -3644,7 +3644,7 @@ local function playAnimation()
         end
         
         local animation = Instance.new("Animation")
-        animation.AnimationId = "rbxassetid://" .. animIdString
+        animation.AnimationId = "rbxassetid://" ... animIdString
         
         pcall(function()
             ContentProvider:PreloadAsync({animation}, function() end)
@@ -3757,7 +3757,7 @@ Options.AnimationDropdown:OnChanged(function(value)
                     end
                     
                     local success, objects = pcall(function()
-                        return game:GetObjects("rbxassetid://" .. animIdNum)
+                        return game:GetObjects("rbxassetid://" ... animIdNum)
                     end)
                     
                     if success and objects and #objects > 0 then
@@ -3797,7 +3797,7 @@ Options.AnimationDropdown:OnChanged(function(value)
                     end
                     
                     local animation = Instance.new("Animation")
-                    animation.AnimationId = "rbxassetid://" .. animIdToUseTrimmed
+                    animation.AnimationId = "rbxassetid://" ... animIdToUseTrimmed
                     
                     pcall(function()
                         ContentProvider:PreloadAsync({animation}, function() end)
@@ -3845,22 +3845,3 @@ end -- Конец функции CreateMainGUI()
 -- Обновляем функции авторизации, чтобы они вызывали CreateMainGUI() после успешной авторизации
 local originalAddHWID = nil
 local originalPastebin = nil
-
-    -- Диагностика HTTP методов
-    print("=== HTTP Methods Diagnostic ===")
-    if http_request then print("✓ http_request available") else print("✗ http_request NOT available") end
-    if syn and syn.request then print("✓ syn.request available") else print("✗ syn.request NOT available") end
-    if request then print("✓ request available") else print("✗ request NOT available") end
-    
-    local httpOk = pcall(function()
-        game:GetService("HttpService"):GetAsync("https://google.com")
-    end)
-    if httpOk then 
-        print("✓ HttpService:GetAsync available") 
-    else 
-        print("✗ HttpService:GetAsync NOT available (likely blocked)")
-    end
-    print("===============================")
-    
-    CreateMainGUI()
-end
