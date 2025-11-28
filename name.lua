@@ -3846,3 +3846,21 @@ end -- Конец функции CreateMainGUI()
 local originalAddHWID = nil
 local originalPastebin = nil
 
+    -- Диагностика HTTP методов
+    print("=== HTTP Methods Diagnostic ===")
+    if http_request then print("✓ http_request available") else print("✗ http_request NOT available") end
+    if syn and syn.request then print("✓ syn.request available") else print("✗ syn.request NOT available") end
+    if request then print("✓ request available") else print("✗ request NOT available") end
+    
+    local httpOk = pcall(function()
+        game:GetService("HttpService"):GetAsync("https://google.com")
+    end)
+    if httpOk then 
+        print("✓ HttpService:GetAsync available") 
+    else 
+        print("✗ HttpService:GetAsync NOT available (likely blocked)")
+    end
+    print("===============================")
+    
+    CreateMainGUI()
+end
