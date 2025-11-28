@@ -1,37 +1,3 @@
-
--- =============================
--- FIXES / DEFAULT DEFINITIONS
--- =============================
-
--- Services
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
-
--- Player
-local LocalPlayer = Players.LocalPlayer
-
--- Default movement values (safe fallbacks)
-local BASE_WALK_SPEED = 16
-local MAX_WALK_SPEED = 100
-local CurrentWalkSpeed = BASE_WALK_SPEED
-
--- Feature flags (defaults)
-local NOCLIP_ENABLED = false
-local MOUNTAIN_CLIMBER_ENABLED = false
-local WAYPOINTS_ENABLED = false
-
--- Safety: clipboard
-if not setclipboard then
-    setclipboard = function() end
-end
-
--- =============================
--- END FIXES
--- =============================
-
-
 -- BoogaX Simple Working GUI
 -- Простой и рабочий интерфейс
 -- 
@@ -52,6 +18,35 @@ end
 -- ✓ ESP оптимизирован с debounce 0.1 сек (обновление расстояния)
 -- ✓ Отключен избыточный вывод warn() для производительности
 -- ✓ Все print/warn HWID системы отключены
+
+
+-- Safe loader for remote code (prevents attempt to call nil when HttpGet/loadstring fails)
+local function safeLoadStringFromUrl(url)
+    local ok, src = pcall(function()
+        if game and game.HttpGet then
+            return game:HttpGet(url)
+        elseif HttpGet then
+            return HttpGet(url)
+        else
+            return nil
+        end
+    end)
+    if not ok or not src or src == "" then
+        warn("safeLoadStringFromUrl: failed to download url: " .. tostring(url))
+        return nil
+    end
+    local fn, err = loadstring(src)
+    if not fn then
+        warn("safeLoadStringFromUrl: loadstring failed: " .. tostring(err))
+        return nil
+    end
+    local success, result = pcall(fn)
+    if not success then
+        warn("safeLoadStringFromUrl: executed chunk error: " .. tostring(result))
+        return nil
+    end
+    return result
+end
 
                   
 -- Оптимизация: Connections для управления
@@ -85,10 +80,10 @@ local defaultLighting = {
 
 
 -- Создание GUI с Fluent UI
-local Fluent = loadstring(game:HttpGet("https://github.com/1dontgiveaf/Fluent/releases/latest/download/main.lua"))()
+local Fluent = safeLoadStringFromUrl("https://github.com/1dontgiveaf/Fluent/releases/latest/download/main.lua")
 
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/1dontgiveaf/Fluent/main/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/1dontgiveaf/Fluent/main/Addons/InterfaceManager.lua"))()
+local SaveManager = safeLoadStringFromUrl("https://raw.githubusercontent.com/1dontgiveaf/Fluent/main/Addons/SaveManager.lua")
+local InterfaceManager = safeLoadStringFromUrl("https://raw.githubusercontent.com/1dontgiveaf/Fluent/main/Addons/InterfaceManager.lua")
 
 local Window = Fluent:CreateWindow({
     Title = "BoogaX Simple",
