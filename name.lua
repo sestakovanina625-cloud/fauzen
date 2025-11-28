@@ -19,36 +19,813 @@
 -- ✓ Отключен избыточный вывод warn() для производительности
 -- ✓ Все print/warn HWID системы отключены
 
+-- ============================================
+-- СИСТЕМА HWID (Hardware ID)
+-- ============================================
+-- вот тут удаляем старые доски
+-- ОПТИМИЗАЦИЯ: вместо каждого кадра (RenderStepped) проверяем раз в 2 секунды
+task.spawn(function()
+    while task.wait(2) do
+        pcall(function()
+            if workspace.Resources then
+                local oldBoards = workspace.Resources:FindFirstChild("Old Boards")
+                if oldBoards then
+                    oldBoards:Destroy()
+                end
+            end
+        end)
+    end
+end)
 
--- Safe loader for remote code (prevents attempt to call nil when HttpGet/loadstring fails)
-local function safeLoadStringFromUrl(url)
-    local ok, src = pcall(function()
-        if game and game.HttpGet then
-            return game:HttpGet(url)
-        elseif HttpGet then
-            return HttpGet(url)
-        else
-            return nil
-        end
-    end)
-    if not ok or not src or src == "" then
-        warn("safeLoadStringFromUrl: failed to download url: " .. tostring(url))
-        return nil
-    end
-    local fn, err = loadstring(src)
-    if not fn then
-        warn("safeLoadStringFromUrl: loadstring failed: " .. tostring(err))
-        return nil
-    end
-    local success, result = pcall(fn)
-    if not success then
-        warn("safeLoadStringFromUrl: executed chunk error: " .. tostring(result))
-        return nil
-    end
-    return result
+local partsData = {
+    {name="SigmaPart", shape=Enum.PartType.Wedge, pos=Vector3.new(-122,-28,-193), size=Vector3.new(4,30,25), ori=Vector3.new(0,180,0)},
+    {name="SigmaPart2", shape=Enum.PartType.Wedge, pos=Vector3.new(-202,5,-616), size=Vector3.new(4,30,25), ori=Vector3.new(0,200,0)},
+    {name="SigmaPart3", pos=Vector3.new(-214,18,-627), size=Vector3.new(12,1,12)},
+    {name="SigmaPart4", shape=Enum.PartType.Wedge, pos=Vector3.new(-44,-104,-392), size=Vector3.new(6,20,17)},
+    {name="SigmaPart5", pos=Vector3.new(-45,-94,-374), size=Vector3.new(13,1,13)},
+}
+
+for _, data in ipairs(partsData) do
+    local p = Instance.new("Part")
+    p.Name = data.name
+    p.Parent = workspace
+    p.Anchored = true
+    p.Color = Color3.fromRGB(255, 0, 0)
+    p.Transparency = 0.9
+    if data.shape then p.Shape = data.shape end
+    if data.ori then p.Orientation = data.ori end
+    p.Position, p.Size = data.pos, data.size
+end
+-- Безопасная инициализация персонажа
+pcall(function()
+	local player = game:GetService("Players").LocalPlayer
+	if player then
+		local char = player.Character or player.CharacterAdded:Wait()
+		if char then
+			local humanoid = char:WaitForChild("Humanoid", 10)
+			if humanoid then
+				humanoid.MaxSlopeAngle = 90
+			end
+		end
+	end
+end)
+-- Глобальная настройка: полностью отключить вывод в консоль
+local SILENT_MODE = false  -- ОТКЛЮЧЕН для диагностики координат
+
+do
+	if SILENT_MODE then
+		local function noop(...) end
+		-- Переопределяем стандартные функции вывода
+		print = noop
+		warn = noop
+		pcall(function() if rconsoleprint then rconsoleprint = noop end end)
+		pcall(function() if rconsoleinfo then rconsoleinfo = noop end end)
+		pcall(function() if rconsolewarn then rconsolewarn = noop end end)
+		pcall(function() if rconsoleerr then rconsoleerr = noop end end)
+	end
 end
 
-                  
+-- Опция для отключения проверки HWID (для тестирования)
+local HWID_CHECK_ENABLED = true -- Установите false чтобы отключить проверку HWID
+
+-- Pastebin URL для списка HWID
+local PASTEBIN_URL = "https://pastebin.com/ud5g2T3T"
+local PASTEBIN_RAW = "https://pastebin.com/raw/ud5g2T3T"
+
+-- Список разрешённых HWID (загружается из Pastebin или используется локальный)
+local WhitelistedHWIDs = {
+    "329B7058-2122-480A-8ED7-2C18AD6D623B", -- улитка
+}
+
+-- Функция загрузки HWID из Pastebin
+local function LoadHWIDsFromPastebin()
+    local response = nil
+    local success = false
+    local usedMethod = "none"
+    
+    -- Метод 1: Через game:HttpGet (если доступен)
+    if not success then
+        local tryHttpGet = pcall(function()
+            if game.HttpGet then
+                response = game:HttpGet(PASTEBIN_RAW)
+                if response then 
+                    success = true 
+                    usedMethod = "game:HttpGet"
+                end
+            end
+        end)
+    end
+    
+    -- Метод 2: Через http_request (если доступен)
+    if not success then
+        local tryHttpRequest = pcall(function()
+            if http_request then
+                local req = http_request({
+                    Url = PASTEBIN_RAW,
+                    Method = "GET"
+                })
+                if req and req.Body then
+                    response = req.Body
+                    success = true
+                    usedMethod = "http_request"
+                end
+            end
+        end)
+    end
+    
+    -- Метод 3: Через syn.request (Synapse X)
+    if not success then
+        local trySynRequest = pcall(function()
+            if syn and syn.request then
+                local req = syn.request({
+                    Url = PASTEBIN_RAW,
+                    Method = "GET"
+                })
+                if req and req.Body then
+                    response = req.Body
+                    success = true
+                    usedMethod = "syn.request"
+                end
+            end
+        end)
+    end
+    
+    -- Метод 4: Через request (другие executor'ы)
+    if not success then
+        local tryRequest = pcall(function()
+            if request then
+                local req = request({
+                    Url = PASTEBIN_RAW,
+                    Method = "GET"
+                })
+                if req and req.Body then
+                    response = req.Body
+                    success = true
+                    usedMethod = "request"
+                end
+            end
+        end)
+    end
+    
+    -- Метод 5: Через HttpService:GetAsync (последний вариант)
+    if not success then
+        local tryGetAsync = pcall(function()
+            if game:GetService("HttpService") then
+                local HttpService = game:GetService("HttpService")
+                response = HttpService:GetAsync(PASTEBIN_RAW)
+                if response then 
+                    success = true 
+                    usedMethod = "HttpService:GetAsync"
+                end
+            end
+        end)
+    end
+    
+    -- Если загрузка не удалась, возвращаем false
+    if not response or not success then
+        --print("⚠️ Could not load HWIDs from Pastebin")
+        --print("Attempted methods:")
+        local methodChecks = {}
+        pcall(function() methodChecks[1] = game.HttpGet and "available" or "not available" end)
+        pcall(function() methodChecks[2] = http_request and "available" or "not available" end)
+        pcall(function() methodChecks[3] = (syn and syn.request) and "available" or "not available" end)
+        pcall(function() methodChecks[4] = request and "available" or "not available" end)
+        
+        --print("  1. game:HttpGet - " .. (methodChecks[1] or "not available"))
+        --print("  2. http_request - " .. (methodChecks[2] or "not available"))
+        --print("  3. syn.request - " .. (methodChecks[3] or "not available"))
+        --print("  4. request - " .. (methodChecks[4] or "not available"))
+        --print("  5. HttpService:GetAsync - available (but blocked)")
+        --print("All methods were blocked or unavailable")
+        --print("Make sure your executor supports HTTP requests to external URLs")
+        --warn("Failed to load HWIDs from Pastebin")
+        return false
+    end
+    
+    -- Парсим ответ
+    local parseSuccess, parseResult = pcall(function()
+        --print("=== Pastebin Response ===")
+        --print("Used method: " .. usedMethod)
+        --print("Raw response length: " .. string.len(response))
+        --print("First 200 chars: " .. string.sub(response, 1, 200))
+        --print("=========================")
+        
+        -- Очищаем старый список (кроме базовых)
+        local baseHWIDs = {}
+        for _, hwid in ipairs(WhitelistedHWIDs) do
+            if hwid == "329B7058-2122-480A-8ED7-2C18AD6D623B" then
+                table.insert(baseHWIDs, hwid)
+            end
+        end
+        WhitelistedHWIDs = baseHWIDs
+        
+        local loadedCount = 0
+        
+        -- Улучшенный парсинг (формат: return {"hwid1", "hwid2", ...})
+        -- Убираем комментарии (включая многострочные)
+        local cleaned = response:gsub("%s*%-%-[^\n]*", "") -- Однострочные комментарии
+        cleaned = cleaned:gsub("%-%-%[%[.-%]%]%-%-", "") -- Многострочные комментарии
+        
+        -- Убираем return и пробелы
+        cleaned = cleaned:gsub("return%s*", "")
+        cleaned = cleaned:gsub("^%s*{", "{") -- Убираем пробелы перед {
+        cleaned = cleaned:gsub("}%s*$", "}") -- Убираем пробелы после }
+        
+        -- Извлекаем HWID между кавычками (учитываем разные варианты кавычек)
+        for hwid in cleaned:gmatch('["\']([^"\']+)["\']') do
+            hwid = hwid:gsub("^%s+", ""):gsub("%s+$", "") -- Убираем пробелы
+            
+            -- Пропускаем пустые строки и тестовые "hwid"
+            if hwid ~= "" and hwid:lower() ~= "hwid" then
+                -- Проверяем, нет ли уже такого HWID
+                local exists = false
+                for _, existing in ipairs(WhitelistedHWIDs) do
+                    if existing == hwid then
+                        exists = true
+                        break
+                    end
+                end
+                if not exists then
+                    table.insert(WhitelistedHWIDs, hwid)
+                    loadedCount = loadedCount + 1
+                    --print("Loaded HWID: " .. hwid)
+                end
+            end
+        end
+        
+        --print("=== Pastebin Load Result ===")
+        --print("Total HWIDs loaded: " .. loadedCount)
+        --print("Total HWIDs in whitelist: " .. #WhitelistedHWIDs)
+        --print("HWID List:")
+        --for i, hwid in ipairs(WhitelistedHWIDs) do
+        --    print("  [" .. i .. "] " .. tostring(hwid))
+        --end
+        --print("============================")
+        
+        return true
+    end)
+    
+    if not parseSuccess then
+        warn("Failed to parse Pastebin response: " .. tostring(parseResult))
+        return false
+    end
+    
+    return parseResult
+end
+
+-- Функция получения HWID пользователя
+local function GetHWID()
+    local hwid = nil
+    
+    -- Метод 1: Через executor функции (самый надежный)
+    if not hwid then
+        pcall(function()
+            if gethwid then
+                hwid = gethwid()
+            elseif syn and syn.get_hwid then
+                hwid = syn.get_hwid()
+            elseif fluxus and fluxus.get_hwid then
+                hwid = fluxus.get_hwid()
+            elseif krnl and krnl.get_hwid then
+                hwid = krnl.get_hwid()
+            end
+        end)
+    end
+    
+    -- Метод 2: Через identifyexecutor
+    if not hwid then
+        pcall(function()
+            if identifyexecutor then
+                local executor = identifyexecutor()
+                if executor == "Synapse X" and syn and syn.get_hwid then
+                    hwid = syn.get_hwid()
+                elseif executor == "Fluxus" and fluxus and fluxus.get_hwid then
+                    hwid = fluxus.get_hwid()
+                end
+            end
+        end)
+    end
+    
+    -- Метод 3: Через getgenv
+    if not hwid then
+        pcall(function()
+            if getgenv then
+                if getgenv().hwid then
+                    hwid = getgenv().hwid
+                elseif getgenv().HardwareID then
+                    hwid = getgenv().HardwareID
+                elseif getgenv().hardware_id then
+                    hwid = getgenv().hardware_id
+                end
+            end
+        end)
+    end
+    
+    -- Метод 4: Через Roblox сервисы
+    if not hwid then
+        pcall(function()
+            local HttpService = game:GetService("HttpService")
+            if HttpService then
+                -- Генерируем уникальный ID на основе игрока
+                local Players = game:GetService("Players")
+                if Players.LocalPlayer then
+                    local userId = Players.LocalPlayer.UserId
+                    hwid = HttpService:GenerateGUID(false) .. "-" .. tostring(userId)
+                else
+                    hwid = HttpService:GenerateGUID(false)
+                end
+            end
+        end)
+    end
+    
+    -- Метод 5: Последний резерв - UserId
+    if not hwid then
+        pcall(function()
+            local Players = game:GetService("Players")
+            if Players.LocalPlayer then
+                hwid = tostring(Players.LocalPlayer.UserId)
+            end
+        end)
+    end
+    
+    return hwid or "unknown"
+end
+
+-- Функция проверки HWID
+local function CheckHWID()
+    local userHWID = GetHWID()
+    
+    -- Преобразуем в строку для надежности
+    userHWID = tostring(userHWID):gsub("^%s+", ""):gsub("%s+$", "") -- Убираем пробелы
+    
+    --print("=== HWID Check ===")
+    --print("Your HWID: [" .. userHWID .. "]")
+    --print("HWID length: " .. string.len(userHWID))
+    --print("Whitelisted HWIDs count: " .. #WhitelistedHWIDs)
+    
+    -- Сначала проверяем, есть ли "hwid" в списке (разрешает всем для тестирования)
+    for _, whitelistedHWID in ipairs(WhitelistedHWIDs) do
+        local whitelistedStr = tostring(whitelistedHWID):gsub("^%s+", ""):gsub("%s+$", "")
+        if whitelistedStr:lower() == "hwid" then
+            --print("Found 'hwid' in whitelist - granting access to all")
+            return true -- Если в списке есть "hwid", разрешаем всем
+        end
+    end
+    
+    -- Проверяем, есть ли точное совпадение HWID в белом списке
+    for i, whitelistedHWID in ipairs(WhitelistedHWIDs) do
+        local whitelistedStr = tostring(whitelistedHWID):gsub("^%s+", ""):gsub("%s+$", "")
+        --print("  Comparing with [" .. i .. "]: [" .. whitelistedStr .. "] (length: " .. string.len(whitelistedStr) .. ")")
+        
+        -- Точное совпадение (с учетом регистра)
+        if whitelistedStr == userHWID then
+            --print("✓ EXACT MATCH FOUND! HWID authorized.")
+            return true
+        end
+        
+        -- Также проверяем без учета регистра (на всякий случай)
+        if whitelistedStr:lower() == userHWID:lower() then
+            --print("✓ MATCH FOUND (case-insensitive)! HWID authorized.")
+            return true
+        end
+    end
+    
+    --print("✗ HWID NOT FOUND in whitelist")
+    --print("Your HWID: [" .. userHWID .. "]")
+    --print("Whitelist:")
+    --for i, hwid in ipairs(WhitelistedHWIDs) do
+    --    print("  [" .. i .. "] [" .. tostring(hwid) .. "]")
+    --end
+    --print("===================")
+    return false -- HWID не найден в белом списке
+end
+
+-- Загружаем HWID из Pastebin при запуске
+if HWID_CHECK_ENABLED then
+    task.spawn(function()
+        LoadHWIDsFromPastebin()
+    end)
+    task.wait(1) -- Даём время на загрузку
+end
+
+-- Проверка HWID перед запуском скрипта (если включена)
+local userHWID = GetHWID()
+local hwidAuthorized = true -- По умолчанию разрешено
+
+if HWID_CHECK_ENABLED then
+    hwidAuthorized = CheckHWID()
+    
+    -- Отладочная информация
+    --print("=== BoogaX HWID Check ===")
+    --print("HWID Check: ENABLED")
+    --print("Your HWID: " .. tostring(userHWID))
+    --print("Whitelisted HWIDs count: " .. #WhitelistedHWIDs)
+    --print("Authorized: " .. tostring(hwidAuthorized))
+    --print("=========================")
+else
+    --print("=== BoogaX HWID Check ===")
+    --print("HWID Check: DISABLED (Testing Mode)")
+    --print("Your HWID: " .. tostring(userHWID))
+    --print("All access granted for testing")
+    --print("=========================")
+end
+
+-- GUI для авторизации HWID (показывается только если не авторизован)
+local HWIDAuthGUI = nil
+
+-- Объявляем функцию CreateMainGUI() заранее (определена ниже)
+local CreateMainGUI = nil
+
+local function CreateHWIDAuthGUI()
+    if HWIDAuthGUI then return end -- Уже создано
+    
+    -- Получаем HWID пользователя
+    local currentUserHWID = GetHWID()
+    
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer or Players:GetPlayers()[1]
+    
+    -- Создание GUI
+    HWIDAuthGUI = Instance.new("ScreenGui")
+    HWIDAuthGUI.Name = "BoogaXHWIDAuth"
+    HWIDAuthGUI.ResetOnSpawn = false
+    HWIDAuthGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    pcall(function()
+        HWIDAuthGUI.Parent = game:GetService("CoreGui")
+    end)
+    if not HWIDAuthGUI.Parent then
+        HWIDAuthGUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end
+    
+    -- Главное окно
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 500, 0, 400)
+    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+    MainFrame.Parent = HWIDAuthGUI
+    
+    local MainCorner = Instance.new("UICorner")
+    MainCorner.CornerRadius = UDim.new(0, 12)
+    MainCorner.Parent = MainFrame
+    
+    -- Заголовок
+    local Header = Instance.new("Frame")
+    Header.Size = UDim2.new(1, 0, 0, 50)
+    Header.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    Header.BorderSizePixel = 0
+    Header.Parent = MainFrame
+    
+    local HeaderCorner = Instance.new("UICorner")
+    HeaderCorner.CornerRadius = UDim.new(0, 12)
+    HeaderCorner.Parent = Header
+    
+    local Title = Instance.new("TextLabel")
+    Title.Text = "🔐 BoogaX HWID Authorization"
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 18
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.Size = UDim2.new(1, -20, 1, 0)
+    Title.Position = UDim2.new(0, 10, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = Header
+    
+    -- Ваш HWID
+    local HWIDFrame = Instance.new("Frame")
+    HWIDFrame.Size = UDim2.new(1, -20, 0, 100)
+    HWIDFrame.Position = UDim2.new(0, 10, 0, 60)
+    HWIDFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    HWIDFrame.BorderSizePixel = 0
+    HWIDFrame.Parent = MainFrame
+    
+    local HWIDCorner = Instance.new("UICorner")
+    HWIDCorner.CornerRadius = UDim.new(0, 8)
+    HWIDCorner.Parent = HWIDFrame
+    
+    local HWIDLabel = Instance.new("TextLabel")
+    HWIDLabel.Text = "Your HWID:"
+    HWIDLabel.Font = Enum.Font.Gotham
+    HWIDLabel.TextSize = 14
+    HWIDLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    HWIDLabel.Size = UDim2.new(1, -20, 0, 25)
+    HWIDLabel.Position = UDim2.new(0, 10, 0, 5)
+    HWIDLabel.BackgroundTransparency = 1
+    HWIDLabel.TextXAlignment = Enum.TextXAlignment.Left
+    HWIDLabel.Parent = HWIDFrame
+    
+    local HWIDDisplay = Instance.new("TextBox")
+    HWIDDisplay.Text = currentUserHWID or "Loading..."
+    HWIDDisplay.Font = Enum.Font.Gotham
+    HWIDDisplay.TextSize = 12
+    HWIDDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HWIDDisplay.Size = UDim2.new(1, -100, 0, 35)
+    HWIDDisplay.Position = UDim2.new(0, 10, 0, 30)
+    HWIDDisplay.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    HWIDDisplay.BorderSizePixel = 0
+    HWIDDisplay.ClearTextOnFocus = false
+    HWIDDisplay.Parent = HWIDFrame
+    
+    -- Обновляем HWID если он ещё не получен
+    if not currentUserHWID or currentUserHWID == "unknown" or HWIDDisplay.Text == "Loading..." then
+        task.spawn(function()
+            task.wait(0.5)
+            local updatedHWID = GetHWID()
+            if updatedHWID and updatedHWID ~= "unknown" then
+                HWIDDisplay.Text = updatedHWID
+                currentUserHWID = updatedHWID
+            end
+        end)
+    end
+    
+    local HWIDCorner2 = Instance.new("UICorner")
+    HWIDCorner2.CornerRadius = UDim.new(0, 6)
+    HWIDCorner2.Parent = HWIDDisplay
+    
+    -- Кнопка копировать HWID
+    local CopyBtn = Instance.new("TextButton")
+    CopyBtn.Size = UDim2.new(0, 80, 0, 35)
+    CopyBtn.Position = UDim2.new(1, -90, 0, 30)
+    CopyBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+    CopyBtn.Text = "Copy"
+    CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CopyBtn.Font = Enum.Font.GothamBold
+    CopyBtn.TextSize = 12
+    CopyBtn.BorderSizePixel = 0
+    CopyBtn.Parent = HWIDFrame
+    
+    local CopyCorner = Instance.new("UICorner")
+    CopyCorner.CornerRadius = UDim.new(0, 6)
+    CopyCorner.Parent = CopyBtn
+    
+    CopyBtn.MouseButton1Click:Connect(function()
+        local hwidText = currentUserHWID or GetHWID()
+        pcall(function()
+            if setclipboard then
+                setclipboard(hwidText)
+            elseif writeclipboard then
+                writeclipboard(hwidText)
+            end
+        end)
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "BoogaX",
+            Text = "HWID copied to clipboard!",
+            Duration = 2
+        })
+    end)
+    
+    -- Убрали поле для ввода HWID - доступ только через Pastebin
+    
+    -- Кнопки (перемещены сразу после блока HWID)
+    local ButtonFrame = Instance.new("Frame")
+    ButtonFrame.Size = UDim2.new(1, -20, 0, 100)
+    ButtonFrame.Position = UDim2.new(0, 10, 0, 170)
+    ButtonFrame.BackgroundTransparency = 1
+    ButtonFrame.Parent = MainFrame
+    
+    local function CreateAuthButton(text, color, callback)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.48, 0, 0, 40)
+        btn.BackgroundColor3 = color
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 14
+        btn.BorderSizePixel = 0
+        btn.Parent = ButtonFrame
+        
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 8)
+        btnCorner.Parent = btn
+        
+        btn.MouseButton1Click:Connect(callback)
+        return btn
+    end
+    
+    -- Убрали кнопку "Add HWID" - доступ только через Pastebin
+    -- Теперь кнопка "Check Pastebin" занимает всю ширину
+    local pastebinBtn = CreateAuthButton("Check Pastebin", Color3.fromRGB(255, 180, 50), function()
+        task.spawn(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "BoogaX",
+                Text = "Checking Pastebin for your HWID...",
+                Duration = 2
+            })
+            
+            local loaded = LoadHWIDsFromPastebin()
+            if loaded then
+                -- Проверяем, авторизован ли теперь
+                if CheckHWID() then
+                    game:GetService("StarterGui"):SetCore("SendNotification", {
+                        Title = "BoogaX",
+                        Text = "✅ Access granted! Your HWID is authorized!",
+                        Duration = 3
+                    })
+                    task.wait(1)
+                    if HWIDAuthGUI then
+                        HWIDAuthGUI:Destroy()
+                        HWIDAuthGUI = nil
+                    end
+                    
+                    -- Создаём основной GUI скрипта
+                    task.wait(0.5)
+                    CreateMainGUI()
+                else
+                    local currentHWID = GetHWID()
+                    game:GetService("StarterGui"):SetCore("SendNotification", {
+                        Title = "BoogaX",
+                        Text = "Your HWID not found in Pastebin.\nCheck console for details.",
+                        Duration = 5
+                    })
+                    --print("⚠️ HWID Check Failed!")
+                    --print("Your HWID: " .. tostring(currentHWID))
+                    --print("Whitelisted HWIDs (" .. #WhitelistedHWIDs .. " total):")
+                    --for i, hwid in ipairs(WhitelistedHWIDs) do
+                    --    print("  [" .. i .. "] " .. tostring(hwid))
+                    --end
+                    --print("Make sure your HWID is added to Pastebin in the correct format.")
+                end
+            else
+                game:GetService("StarterGui"):SetCore("SendNotification", {
+                    Title = "BoogaX",
+                    Text = "Failed to load from Pastebin! Check internet connection.",
+                    Duration = 3
+                })
+            end
+        end)
+    end)
+    pastebinBtn.Size = UDim2.new(1, 0, 0, 40)
+    pastebinBtn.Position = UDim2.new(0, 0, 0, 0)
+    
+    -- Кнопка автоматической проверки (обновляет каждые 5 секунд)
+    local autoChecking = false
+    local autoCheckBtn = CreateAuthButton("Auto Check (5s)", Color3.fromRGB(100, 200, 255), function()
+        if autoChecking then 
+            autoChecking = false
+            -- Безопасная проверка перед изменением текста
+            pcall(function()
+                if autoCheckBtn and autoCheckBtn.Parent then
+                    autoCheckBtn.Text = "Auto Check (5s)"
+                end
+            end)
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "BoogaX",
+                Text = "Auto check stopped",
+                Duration = 2
+            })
+            return 
+        end
+        
+        autoChecking = true
+        -- Безопасная проверка перед изменением текста
+        pcall(function()
+            if autoCheckBtn and autoCheckBtn.Parent then
+                autoCheckBtn.Text = "Stop Auto Check"
+            end
+        end)
+        
+        task.spawn(function()
+            while autoChecking do
+                -- Проверяем, что GUI ещё существует
+                if not HWIDAuthGUI or not HWIDAuthGUI.Parent then
+                    autoChecking = false
+                    break
+                end
+                
+                local loaded = LoadHWIDsFromPastebin()
+                if loaded and CheckHWID() then
+                    game:GetService("StarterGui"):SetCore("SendNotification", {
+                        Title = "BoogaX",
+                        Text = "✅ Access granted! Your HWID is authorized!",
+                        Duration = 3
+                    })
+                    task.wait(1)
+                    autoChecking = false -- Останавливаем проверку перед уничтожением GUI
+                    
+                    if HWIDAuthGUI then
+                        HWIDAuthGUI:Destroy()
+                        HWIDAuthGUI = nil
+                    end
+                    CreateMainGUI()
+                    break
+                end
+                if autoChecking then
+                    task.wait(5) -- Проверяем каждые 5 секунд
+                end
+            end
+        end)
+    end)
+    autoCheckBtn.Size = UDim2.new(1, 0, 0, 40)
+    autoCheckBtn.Position = UDim2.new(0, 0, 0, 50)
+    
+    -- Убрали кнопку "Continue Anyway" - теперь авторизация обязательна
+    
+    -- Инструкции для пользователя (после кнопок)
+    local InstructionsFrame = Instance.new("Frame")
+    InstructionsFrame.Size = UDim2.new(1, -20, 0, 100)
+    InstructionsFrame.Position = UDim2.new(0, 10, 0, 280)
+    InstructionsFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    InstructionsFrame.BorderSizePixel = 0
+    InstructionsFrame.Parent = MainFrame
+    
+    local InstructionsCorner = Instance.new("UICorner")
+    InstructionsCorner.CornerRadius = UDim.new(0, 8)
+    InstructionsCorner.Parent = InstructionsFrame
+    
+    local InstructionsLabel = Instance.new("TextLabel")
+    InstructionsLabel.Text = "📋 Instructions:\n1. Copy your HWID\n2. Send to script owner\n3. Wait for owner to add it to Pastebin\n4. Click 'Check Pastebin' or enable 'Auto Check'"
+    InstructionsLabel.Font = Enum.Font.Gotham
+    InstructionsLabel.TextSize = 11
+    InstructionsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    InstructionsLabel.Size = UDim2.new(1, -20, 1, -10)
+    InstructionsLabel.Position = UDim2.new(0, 10, 0, 5)
+    InstructionsLabel.BackgroundTransparency = 1
+    InstructionsLabel.TextXAlignment = Enum.TextXAlignment.Left
+    InstructionsLabel.TextYAlignment = Enum.TextYAlignment.Top
+    InstructionsLabel.TextWrapped = true
+    InstructionsLabel.Parent = InstructionsFrame
+end
+
+-- Переменная для отслеживания авторизации
+local hwidAuthorizedFlag = hwidAuthorized
+
+-- Функция для создания основного GUI скрипта (вызывается только после авторизации)
+CreateMainGUI = function()
+    -- Проверяем, что GUI ещё не создан
+    if game:GetService("CoreGui"):FindFirstChild("BoogaXSimple") then
+        return -- GUI уже создан
+    end
+    
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local RunService = game:GetService("RunService")
+    local TweenService = game:GetService("TweenService")
+    local UserInputService = game:GetService("UserInputService")
+    local Lighting = game:GetService("Lighting")
+	local HttpService = game:GetService("HttpService")
+
+-- Создание папки BoogaX при запуске
+local function CreateBoogaXFolder()
+    local folderPath = "BoogaX"
+    local success = false
+    
+    -- Пробуем создать папку через makefolder
+    local tryMakefolder = pcall(function()
+        if makefolder then
+            makefolder(folderPath)
+            success = true
+        end
+    end)
+    
+    -- Если не получилось через makefolder, пробуем через writefile (создаст папку автоматически)
+    if not success then
+        local tryWritefile = pcall(function()
+            if writefile then
+                -- Создаём файл-пример в папке (это создаст папку)
+                writefile(folderPath .. "/coordinates.txt", "-- Place your coordinates here (JSON or simple format)\n-- JSON format: {\"position\":[{\"X\":1,\"Y\":2,\"Z\":3}]}\n-- Simple format: X,Y,Z; X,Y,Z; ...\n\n-- WAIT FORMAT (NEW!) - Waypoints with pause times:\n-- {\"wait\":[10,20,5],\"positions\":[\"X,Y,Z\",\"X,Y,Z\",\"X,Y,Z\"]}\n-- Each position gets paired with its wait time (in seconds)\n-- Example: {\"wait\":[10],\"positions\":[\"-69.68,-31.02,-96.48\"]}\n-- This will create a waypoint at (-69.68,-31.02,-96.48) and wait 10 seconds there")
+                success = true
+            end
+        end)
+    end
+    
+    if success then
+        print("✓ BoogaX folder created successfully!")
+        print("📁 Folder path: " .. folderPath)
+        print("📝 Place your coordinates file in: " .. folderPath .. "/coordinates.txt")
+    else
+        warn("⚠️ Could not create BoogaX folder. Make sure your executor supports file operations.")
+        print("Available functions check:")
+        pcall(function() print("  makefolder: " .. (makefolder and "available" or "not available")) end)
+        pcall(function() print("  writefile: " .. (writefile and "available" or "not available")) end)
+    end
+end
+
+-- Вызываем создание папки при запуске
+CreateBoogaXFolder()
+
+-- Переменные
+local BASE_WALK_SPEED = 16
+local MAX_WALK_SPEED = 22
+local CurrentWalkSpeed = BASE_WALK_SPEED
+local ESP_ENABLED = false
+local MOUNTAIN_CLIMBER_ENABLED = false
+local HITBOXES_ENABLED = false
+local NIGHT_VISION_ENABLED = false
+local GLOW_ENABLED = false
+local WAYPOINTS_ENABLED = false
+local CRYSTAL_FARM_ENABLED = false
+local CRYSTAL_FARM_RUNNING = false
+local ANCIENT_TREE_FARM_ENABLED = false
+local ANCIENT_TREE_FARM_RUNNING = false
+local ESSENCE_PICKUP_RUNNING = false
+local GOLD_FARM_ENABLED = false
+local GOLD_FARM_RUNNING = false
+local NOCLIP_ENABLED = false
+
 -- Оптимизация: Connections для управления
 local NoclipConnection = nil
 local MountainClimberConnection = nil
@@ -77,13 +854,1020 @@ local defaultLighting = {
     OutdoorAmbient = Lighting.OutdoorAmbient
 }
 
+	-- Telegram notifier state
+	local TELEGRAM_ENABLED = false
+	local TELEGRAM_BOT_TOKEN = ""
+	local TELEGRAM_CHAT_ID = "" -- Основной Chat ID этого аккаунта
+	local TELEGRAM_CHAT_IDS = {} -- Список ВСЕХ подключенных Chat ID
+	local GOLD_FARMED_TOTAL = 0
+	local PLAYER_NAME = "Player"
+	pcall(function()
+		local player = game:GetService("Players").LocalPlayer
+		if player then
+			PLAYER_NAME = player.Name or "Player"
+		end
+	end)
+	local SCRIPT_START_TIME = tick() -- Время запуска скрипта
 
+	-- Функция форматирования времени работы скрипта в HH:MM:SS
+	local function FormatUptime()
+		local elapsed = tick() - SCRIPT_START_TIME
+		local hours = math.floor(elapsed / 3600)
+		local minutes = math.floor((elapsed % 3600) / 60)
+		local seconds = math.floor(elapsed % 60)
+		return string.format("%02d:%02d:%02d", hours, minutes, seconds)
+	end
+
+	-- Кэширование для GetRawGoldAmount
+	local cachedRawGold = 0
+	local lastGoldCheck = 0
+	local GOLD_CHECK_INTERVAL = 3 -- Проверяем раз в 3 секунды для актуальности данных
+
+	local function GetRawGoldAmount()
+		-- Используем кэш если прошло меньше заданного интервала
+		local currentTime = tick()
+		if currentTime - lastGoldCheck < GOLD_CHECK_INTERVAL then
+			print("[GetRawGoldAmount] Returning cached value: " .. cachedRawGold)
+			return cachedRawGold
+		end
+		lastGoldCheck = currentTime
+		
+		print("[GetRawGoldAmount] Scanning for Raw Gold...")
+		
+		local player = game:GetService("Players").LocalPlayer
+		if not player or not player.PlayerGui then 
+			print("[GetRawGoldAmount] Player or PlayerGui not found!")
+			return 0
+		end
+		
+		local totalRawGold = 0
+		local foundItems = {}
+		
+		for _, element in ipairs(player.PlayerGui:GetDescendants()) do
+			if (element:IsA("ImageButton") or element:IsA("ImageLabel") or element:IsA("Frame")) and element.Visible then
+				
+				local elementName = element.Name:lower()
+				local isRawGold = false
+				
+				if (elementName:find("raw") and elementName:find("gold")) or elementName:find("rawgold") then
+					isRawGold = true
+				end
+				
+				if not isRawGold then
+					for _, child in ipairs(element:GetChildren()) do
+						if child:IsA("TextLabel") and child.Name:lower():find("name") then
+							local itemName = child.Text:lower()
+							if (itemName:find("raw") and itemName:find("gold")) or itemName:find("rawgold") then
+								isRawGold = true
+								break
+							end
+						end
+					end
+				end
+				
+				if not isRawGold and (element:IsA("ImageLabel") or element:IsA("ImageButton")) then
+					local imageId = tostring(element.Image):lower()
+					if imageId:find("gold") or imageId:find("ore") then
+						isRawGold = true
+					end
+				end
+				
+				if isRawGold then
+					local amount = 0
+					
+					for _, child in ipairs(element:GetDescendants()) do
+						if child:IsA("TextLabel") and child.Visible then
+							local text = child.Text
+							if not text:lower():find("raw") and not text:lower():find("gold") then
+								local num = tonumber(text)
+								if num and num > 0 then
+									amount = num
+									break
+								end
+							end
+						end
+					end
+					
+					if amount == 0 then
+						amount = 1
+					end
+					
+					totalRawGold = totalRawGold + amount
+					table.insert(foundItems, {path = element:GetFullName(), amount = amount})
+				end
+			end
+		end
+		
+		cachedRawGold = totalRawGold
+		print("[GetRawGoldAmount] Found " .. #foundItems .. " items, Total gold: " .. totalRawGold)
+		
+		-- Выводим детали найденных предметов (для диагностики)
+		if #foundItems > 0 then
+			print("[GetRawGoldAmount] Details:")
+			for i, item in ipairs(foundItems) do
+				print("  [" .. i .. "] Amount: " .. item.amount .. " | Path: " .. item.path)
+			end
+		else
+			print("[GetRawGoldAmount] ⚠️ No Raw Gold items found in PlayerGui!")
+		end
+		
+		return totalRawGold
+	end
+
+	-- Система синхронизации аккаунтов
+	local function UpdateAccountInfo()
+		-- Обновляем информацию о текущем аккаунте в общем файле
+		local folderPath = "BoogaX"
+		local accountsFile = folderPath .. "/accounts.json"
+		local accounts = {}
+		
+		-- Читаем существующие аккаунты
+		pcall(function()
+			if readfile then
+				local content = readfile(accountsFile)
+				if content and content ~= "" then
+					accounts = HttpService:JSONDecode(content) or {}
+				end
+			end
+		end)
+		
+	-- ОБНОВЛЯЕМ ЗОЛОТО ПЕРЕД СОХРАНЕНИЕМ
+	local currentGold = GetRawGoldAmount()
+	
+	-- Обновляем/добавляем текущий аккаунт
+	accounts[PLAYER_NAME] = {
+		player_name = PLAYER_NAME,
+		chat_id = TELEGRAM_CHAT_ID,
+		raw_gold = currentGold,
+		last_update = os.time(),
+	}
+		
+		-- Сохраняем
+		pcall(function()
+			if writefile then
+				writefile(accountsFile, HttpService:JSONEncode(accounts))
+			end
+		end)
+		
+		return accounts
+	end
+	
+	local function GetAllAccounts()
+		local folderPath = "BoogaX"
+		local accountsFile = folderPath .. "/accounts.json"
+		local accounts = {}
+		
+		pcall(function()
+			if readfile then
+				local content = readfile(accountsFile)
+				if content and content ~= "" then
+					accounts = HttpService:JSONDecode(content) or {}
+				end
+			end
+		end)
+		
+		return accounts
+	end
+
+	-- Persistence helpers for Telegram settings
+	local function LoadTelegramSettings()
+		print("📂 LoadTelegramSettings: Loading settings...")
+		local folderPath = "BoogaX"
+		local filePath = folderPath .. "/telegram.json"
+		local loaded = false
+		pcall(function()
+			if readfile then
+				local content = readfile(filePath)
+				if content and content ~= "" then
+					local data = HttpService:JSONDecode(content)
+					TELEGRAM_BOT_TOKEN = tostring(data.bot_token or "")
+					TELEGRAM_CHAT_ID = tostring(data.chat_id or "")
+					TELEGRAM_CHAT_IDS = data.chat_ids or {}
+					TELEGRAM_ENABLED = data.enabled == true
+					GOLD_FARMED_TOTAL = tonumber(data.gold_total or 0) or 0
+					loaded = true
+					print("✅ LoadTelegramSettings: Settings loaded")
+					print("   TELEGRAM_ENABLED: " .. tostring(TELEGRAM_ENABLED))
+					print("   TELEGRAM_BOT_TOKEN: " .. (TELEGRAM_BOT_TOKEN ~= "" and string.sub(TELEGRAM_BOT_TOKEN, 1, 10) .. "..." or "EMPTY"))
+					print("   TELEGRAM_CHAT_ID: " .. (TELEGRAM_CHAT_ID ~= "" and TELEGRAM_CHAT_ID or "EMPTY"))
+					print("   TELEGRAM_CHAT_IDS count: " .. #TELEGRAM_CHAT_IDS)
+				else
+					print("⚠️ LoadTelegramSettings: File is empty or doesn't exist")
+				end
+			else
+				print("⚠️ LoadTelegramSettings: readfile function not available")
+			end
+		end)
+		if not loaded then
+			print("❌ LoadTelegramSettings: Failed to load settings")
+		end
+		return loaded
+	end
+
+	local function SaveTelegramSettings()
+		local folderPath = "BoogaX"
+		local filePath = folderPath .. "/telegram.json"
+		
+		-- ВАЖНО: Перечитываем файл чтобы получить актуальный список всех Chat ID
+		local allChatIds = {}
+		local existingBotToken = TELEGRAM_BOT_TOKEN
+		local existingEnabled = TELEGRAM_ENABLED
+		
+		pcall(function()
+			if readfile then
+				local content = readfile(filePath)
+				if content and content ~= "" then
+					local data = HttpService:JSONDecode(content)
+					allChatIds = data.chat_ids or {}
+					-- Используем существующий токен если текущий пустой
+					if TELEGRAM_BOT_TOKEN == "" and data.bot_token then
+						existingBotToken = tostring(data.bot_token)
+					end
+				end
+			end
+		end)
+		
+		-- Добавляем текущий Chat ID в общий список если его там нет
+		if TELEGRAM_CHAT_ID ~= "" then
+			local found = false
+			for _, id in ipairs(allChatIds) do
+				if tostring(id) == tostring(TELEGRAM_CHAT_ID) then
+					found = true
+					break
+				end
+			end
+			if not found then
+				table.insert(allChatIds, TELEGRAM_CHAT_ID)
+			end
+		end
+		
+		-- Обновляем локальную переменную
+		TELEGRAM_CHAT_IDS = allChatIds
+		
+		local data = {
+			bot_token = existingBotToken,
+			chat_id = TELEGRAM_CHAT_ID,
+			chat_ids = allChatIds, -- Все подключенные Chat ID
+			enabled = existingEnabled,
+			gold_total = GOLD_FARMED_TOTAL,
+		}
+		pcall(function()
+			if writefile then
+				writefile(filePath, HttpService:JSONEncode(data))
+			end
+		end)
+	end
+
+	-- Telegram sender with executor fallbacks
+	local function UrlEncode(str)
+		str = tostring(str)
+		-- First handle newlines
+		str = str:gsub("\r\n", "\n")
+		str = str:gsub("\r", "\n")
+		
+		-- Encode each byte properly (handles UTF-8 multibyte characters)
+		local encoded = ""
+		for i = 1, #str do
+			local c = str:sub(i, i)
+			local byte = string.byte(c)
+			
+			-- Keep unreserved characters as-is
+			if (byte >= 48 and byte <= 57) or  -- 0-9
+			   (byte >= 65 and byte <= 90) or  -- A-Z
+			   (byte >= 97 and byte <= 122) or -- a-z
+			   c == "-" or c == "_" or c == "." or c == "~" then
+				encoded = encoded .. c
+			-- Convert newline to %0A
+			elseif c == "\n" then
+				encoded = encoded .. "%0A"
+			-- Convert space to +
+			elseif c == " " then
+				encoded = encoded .. "+"
+			-- Percent-encode everything else (including UTF-8 bytes)
+			else
+				encoded = encoded .. string.format("%%%02X", byte)
+			end
+		end
+		
+		return encoded
+	end
+
+	-- Универсальная функция для HTTP запросов
+	local function MakeHttpRequest(url)
+		local response = nil
+		local success = false
+		
+		-- Try http_request
+		if not success then
+			pcall(function()
+				if http_request then
+					local r = http_request({ Url = url, Method = "GET" })
+					if r and r.Body then
+						response = r.Body
+						success = true
+					end
+				end
+			end)
+		end
+		
+		-- Try syn.request
+		if not success then
+			pcall(function()
+				if syn and syn.request then
+					local r = syn.request({ Url = url, Method = "GET" })
+					if r and r.Body then
+						response = r.Body
+						success = true
+					end
+				end
+			end)
+		end
+		
+		-- Try request
+		if not success then
+			pcall(function()
+				if request then
+					local r = request({ Url = url, Method = "GET" })
+					if r and r.Body then
+						response = r.Body
+						success = true
+					end
+				end
+			end)
+		end
+		
+		-- Try HttpService:GetAsync
+		if not success then
+			pcall(function()
+				response = HttpService:GetAsync(url)
+				success = true
+			end)
+		end
+		
+		return success, response
+	end
+
+	-- Проверка токена бота
+	local function CheckBotToken()
+		if TELEGRAM_BOT_TOKEN == "" then
+			return false, "Token is empty"
+		end
+		
+		local url = "https://api.telegram.org/bot" .. TELEGRAM_BOT_TOKEN .. "/getMe"
+		local success, response = MakeHttpRequest(url)
+		
+		if not success or not response then
+			return false, "No HTTP methods available in executor"
+		end
+		
+		print("Bot check response:", response)
+		
+		if response:find('"ok":true') then
+			local botName = response:match('"username":"([^"]+)"')
+			return true, "Bot OK: @" .. (botName or "unknown")
+		elseif response:find('"error_code":401') or response:find("Unauthorized") then
+			return false, "Invalid Bot Token (401 Unauthorized)"
+		else
+			return false, "Unknown error: " .. string.sub(response, 1, 100)
+		end
+	end
+
+	-- Получение обновлений для определения Chat ID
+	local function GetChatIdFromUpdates()
+		if TELEGRAM_BOT_TOKEN == "" then
+			return nil, "❌ Токен бота пустой!"
+		end
+		
+		print("🔍 Получаю обновления от Telegram бота...")
+		
+		local url = "https://api.telegram.org/bot" .. TELEGRAM_BOT_TOKEN .. "/getUpdates?offset=-1"
+		local success, response = MakeHttpRequest(url)
+		
+		if not success or not response then
+			return nil, "❌ HTTP запрос не удался\nПроверь интернет подключение"
+		end
+		
+		print("📡 Ответ от Telegram:", string.sub(response, 1, 300))
+		
+		if response:find('"ok":true') then
+			-- Улучшенный поиск chat id - ищем ВСЕ возможные варианты
+			local chatId = response:match('"chat":{"id":([%-]?%d+)')
+			
+			-- Альтернативные паттерны на случай другого формата
+			if not chatId then
+				chatId = response:match('"from":{"id":([%-]?%d+)')
+			end
+			
+			if chatId then
+				print("✅ Chat ID найден: " .. chatId)
+				return chatId, "Успешно!"
+			else
+				print("⚠️ Сообщения не найдены в ответе")
+				return nil, "❌ Сообщений не найдено!\n\n📱 Отправь /start боту в Telegram:\n1. Открой бота в Telegram\n2. Нажми START или напиши /start\n3. Нажми эту кнопку снова"
+			end
+		elseif response:find('"error_code":401') or response:find("Unauthorized") then
+			return nil, "❌ Неверный токен бота!\nПроверь Bot Token"
+		else
+			return nil, "❌ Ошибка Telegram API\n" .. string.sub(response, 1, 100)
+		end
+	end
+
+	-- СИСТЕМА ПОИСКА RAW GOLD ДЛЯ BOOGA BOOGA REBORN
+	-- Ищет во всех возможных местах, где игра может хранить Raw Gold
+	
+	-- Улучшенный парсинг чисел из текста
+	local function ParseNumberFromText(text)
+		if not text then return 0 end
+		text = tostring(text):gsub("%s", "") -- убираем пробелы
+		
+		-- Формат с суффиксом: 10.5M, 1.2K, 5B
+		local numStr, suffix = text:match("([%d%.]+)([KkMmBb])")
+		if numStr and suffix then
+			local num = tonumber(numStr)
+			if num then
+				local mult = {k=1000, m=1000000, b=1000000000}
+				return math.floor(num * (mult[suffix:lower()] or 1))
+			end
+		end
+		
+		-- Убираем запятые (разделители тысяч): 10,000 -> 10000
+		text = text:gsub(",", "")
+		
+		-- Пробуем распарсить как число напрямую
+		local num = tonumber(text)
+		if num then
+			return math.floor(num)
+		end
+		
+		-- Ищем первое число в строке (даже если есть текст)
+		local numStr = text:match("([%d%.]+)")
+		if numStr then
+			num = tonumber(numStr)
+			if num then
+				return math.floor(num)
+			end
+		end
+		
+		-- Последняя попытка: ищем любую последовательность цифр
+		local digits = text:match("%d+")
+		if digits then
+			num = tonumber(digits)
+			return num or 0
+		end
+		
+		return 0
+	end
+	
+	local function SendTelegramMessage(text)
+		if not TELEGRAM_ENABLED or TELEGRAM_BOT_TOKEN == "" or TELEGRAM_CHAT_ID == "" then 
+			print("❌ Telegram not enabled or missing credentials")
+			return false 
+		end
+		
+		local url = "https://api.telegram.org/bot" .. TELEGRAM_BOT_TOKEN .. "/sendMessage?chat_id=" .. UrlEncode(TELEGRAM_CHAT_ID) .. "&text=" .. UrlEncode(text)
+		
+		print("=== Telegram Send Attempt ===")
+		print("Bot Token: " .. string.sub(TELEGRAM_BOT_TOKEN, 1, 20) .. "...")
+		print("Chat ID: " .. TELEGRAM_CHAT_ID)
+		print("Message: " .. text)
+		
+		local success, response = MakeHttpRequest(url)
+		
+		if success and response then
+			print("Response:", string.sub(response, 1, 200))
+			if response:find('"ok":true') then
+				print("✅ Message sent successfully!")
+				return true
+			else
+				print("❌ Telegram API error:", response)
+				return false
+			end
+		else
+			print("❌ No HTTP method available in executor!")
+			return false
+		end
+	end
+
+	local function IncrementGold(amount)
+		amount = tonumber(amount) or 0
+		if amount == 0 then return end
+		GOLD_FARMED_TOTAL = math.max(0, GOLD_FARMED_TOTAL + amount)
+		SaveTelegramSettings()
+		if TELEGRAM_ENABLED then
+			local playerName = (game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.Name) or "Player"
+			local msg = "💰 Gold farmed: +" .. tostring(amount) .. "\nTotal: " .. tostring(GOLD_FARMED_TOTAL) .. "\n👤 " .. playerName
+			SendTelegramMessage(msg)
+		end
+	end
+
+
+	-- Telegram bot command handler
+	local LAST_UPDATE_ID = 0
+	local BOT_LOOP_RUNNING = false -- Флаг для предотвращения множественных запусков
+	
+	local function GetTelegramUpdates()
+		if not TELEGRAM_ENABLED or TELEGRAM_BOT_TOKEN == "" then 
+			-- Не логируем каждый раз, чтобы не засорять консоль
+			return nil 
+		end
+		
+		-- Используем offset для получения только новых обновлений
+		-- Если LAST_UPDATE_ID = 0, получим все непрочитанные обновления
+		local offset = LAST_UPDATE_ID + 1
+		local url = "https://api.telegram.org/bot" .. TELEGRAM_BOT_TOKEN .. "/getUpdates?offset=" .. tostring(offset) .. "&timeout=1&allowed_updates=[\"message\"]"
+		
+		local success, response = MakeHttpRequest(url)
+		
+		if not success or not response then
+			-- Логируем только периодически, чтобы не засорять консоль
+			return nil
+		end
+		
+		local decodeSuccess, data = pcall(function()
+			return HttpService:JSONDecode(response)
+		end)
+		
+		if not decodeSuccess then
+			print("❌ GetTelegramUpdates: JSON decode failed")
+			print("Response: " .. string.sub(tostring(response), 1, 200))
+			return nil
+		end
+		
+		if data and data.ok and data.result then
+			if #data.result > 0 then
+				print("✅ GetTelegramUpdates: Received " .. #data.result .. " update(s), offset was: " .. offset)
+			end
+			return data.result
+		elseif data and not data.ok then
+			local errorDescription = tostring(data.description or "Unknown error")
+			local errorCode = data.error_code or 0
+			
+			-- Обработка конфликта: если другой экземпляр бота уже получает обновления
+			if errorCode == 409 or errorDescription:find("Conflict") or errorDescription:find("terminated by other getUpdates") then
+				-- Это нормальная ситуация, если запущено несколько экземпляров скрипта
+				-- Не логируем каждый раз, чтобы не засорять консоль
+				-- Просто ждем и пробуем снова в следующей итерации
+				return nil
+			end
+			
+			-- Для других ошибок логируем только первый раз
+			if not (GetTelegramUpdates.lastError == errorDescription) then
+				print("❌ GetTelegramUpdates: Telegram API error: " .. errorDescription)
+				GetTelegramUpdates.lastError = errorDescription
+				if errorCode == 401 then
+					print("   This usually means the bot token is invalid!")
+				end
+			end
+		end
+		
+		return nil
+	end
+	
+	local function HandleTelegramCommand(message)
+		if not message or not message.text then 
+			print("⚠️ HandleTelegramCommand: No message or text")
+			return 
+		end
+		
+		local text = message.text
+		local chatId = tostring(message.chat.id)
+		
+		print("📨 HandleTelegramCommand: Received command '" .. text .. "' from chat " .. chatId)
+		
+		-- Получаем актуальный список Chat ID из файла
+		local allChatIds = {}
+		local folderPath = "BoogaX"
+		local filePath = folderPath .. "/telegram.json"
+		pcall(function()
+			if readfile then
+				local content = readfile(filePath)
+				if content and content ~= "" then
+					local data = HttpService:JSONDecode(content)
+					allChatIds = data.chat_ids or {}
+				end
+			end
+		end)
+		
+		-- Проверяем что это один из наших Chat ID
+		local isAuthorized = false
+		for _, id in ipairs(allChatIds) do
+			if tostring(id) == chatId then
+				isAuthorized = true
+				break
+			end
+		end
+		
+		-- Разрешаем /start от любого пользователя (для первого подключения)
+		-- Если это /start и пользователь не авторизован, добавляем его в список
+		if text == "/start" and not isAuthorized then
+			-- Добавляем новый Chat ID в список (мы уже знаем, что его там нет)
+			table.insert(allChatIds, chatId)
+			-- Сохраняем обновленный список
+			local folderPath = "BoogaX"
+			local filePath = folderPath .. "/telegram.json"
+			pcall(function()
+				if readfile and writefile then
+					local content = readfile(filePath)
+					local data = {}
+					if content and content ~= "" then
+						data = HttpService:JSONDecode(content) or {}
+					end
+					-- Сохраняем все существующие данные и обновляем chat_ids
+					data.chat_ids = allChatIds
+					writefile(filePath, HttpService:JSONEncode(data))
+					print("✅ Новый Chat ID добавлен: " .. chatId)
+				end
+			end)
+			isAuthorized = true -- Теперь пользователь авторизован
+		end
+		
+		-- Для всех остальных команд требуем авторизацию
+		if not isAuthorized then 
+			print("⚠️ HandleTelegramCommand: User not authorized, chat ID: " .. chatId)
+			return 
+		end
+
+	if text == "/start" then
+		print("🚀 Processing /start command from chat " .. chatId)
+		if TELEGRAM_BOT_TOKEN == "" then 
+			print("❌ /start: Bot token is empty")
+			return 
+		end
+		
+		-- ОБНОВЛЯЕМ КЭШИРОВАННОЕ ЗОЛОТО ПЕРЕД ИСПОЛЬЗОВАНИЕМ
+		print("💰 Getting raw gold amount...")
+		local currentGold = GetRawGoldAmount()
+		print("✅ GetRawGoldAmount completed. Current gold: " .. tostring(currentGold))
+		
+		local folderPath = "BoogaX"
+		local lockFile = folderPath .. "/start_lock.json"
+		local accountsFile = folderPath .. "/accounts.json"
+		
+		print("📁 Checking lock file...")
+		-- ПРОВЕРКА БЛОКИРОВКИ СРАЗУ (до обновления данных!)
+		local canRespond = false
+		local currentTime = tick()
+		print("   Current time: " .. tostring(currentTime))
+		
+		local lockCheckSuccess, lockCheckErr = pcall(function()
+			if readfile then
+				local content = readfile(lockFile)
+				if content and content ~= "" then
+					print("   Lock file exists, checking timestamp...")
+					local lockData = HttpService:JSONDecode(content)
+					local timeSince = currentTime - (lockData.timestamp or 0)
+					print("   Time since lock: " .. tostring(timeSince) .. " seconds")
+					if timeSince >= 5 then -- Блокировка на 5 секунд
+						canRespond = true
+						print("   ✅ Lock expired, can respond")
+					else
+						print("   ⏸️ Lock still active, cannot respond")
+					end
+				else
+					canRespond = true -- Файла нет, можем отвечать
+					print("   ✅ No lock file, can respond")
+				end
+			else
+				canRespond = true
+				print("   ⚠️ readfile not available, assuming can respond")
+			end
+		end)
+		
+		if not lockCheckSuccess then
+			print("   ⚠️ Error checking lock: " .. tostring(lockCheckErr))
+			canRespond = true -- В случае ошибки разрешаем отвечать
+		end
+		
+		print("   Final canRespond: " .. tostring(canRespond))
+		
+		-- Если не можем отвечать, обновляем данные и выходим
+		if not canRespond then
+			print("⏸️ Cannot respond (locked), updating data and exiting...")
+			-- Быстро обновляем только свои данные
+			local accounts = {}
+			pcall(function()
+				if readfile then
+					local content = readfile(accountsFile)
+					if content and content ~= "" then
+						accounts = HttpService:JSONDecode(content) or {}
+					end
+				end
+			end)
+			
+			accounts[PLAYER_NAME] = {
+				player_name = PLAYER_NAME,
+				chat_id = TELEGRAM_CHAT_ID,
+				raw_gold = currentGold,
+				last_update = os.time(),
+			}
+			
+			pcall(function()
+				if writefile then
+					writefile(accountsFile, HttpService:JSONEncode(accounts))
+				end
+			end)
+			print("✅ Data updated, exiting (another account is responding)")
+			return -- Другой аккаунт уже отвечает
+		end
+		
+		print("✅ Can respond, proceeding...")
+		
+		-- СОЗДАЁМ БЛОКИРОВКУ СРАЗУ
+		print("🔒 Creating lock file...")
+		pcall(function()
+			if writefile then
+				writefile(lockFile, HttpService:JSONEncode({timestamp = currentTime, player = PLAYER_NAME}))
+				print("   ✅ Lock file created")
+			else
+				print("   ⚠️ writefile not available")
+			end
+		end)
+		
+		-- Обновляем свои данные
+		print("💾 Updating account data...")
+		local accounts = {}
+		pcall(function()
+			if readfile then
+				local content = readfile(accountsFile)
+				if content and content ~= "" then
+					accounts = HttpService:JSONDecode(content) or {}
+					print("   ✅ Loaded existing accounts file")
+				else
+					print("   ℹ️ No existing accounts file")
+				end
+			end
+		end)
+		
+		accounts[PLAYER_NAME] = {
+			player_name = PLAYER_NAME,
+			chat_id = TELEGRAM_CHAT_ID,
+			raw_gold = currentGold,
+			last_update = os.time(),
+		}
+		print("   Updated account: " .. PLAYER_NAME .. " with gold: " .. tostring(currentGold))
+		
+		pcall(function()
+			if writefile then
+				writefile(accountsFile, HttpService:JSONEncode(accounts))
+				print("   ✅ Accounts file saved")
+			end
+		end)
+		
+		-- Маленькая задержка для других аккаунтов
+		print("⏳ Waiting 0.2 seconds for other accounts...")
+		task.wait(0.2)
+		print("✅ Wait completed, getting all accounts...")
+		
+		-- Получаем всех аккаунтов с обработкой ошибок
+		print("📋 Getting all accounts...")
+		local allAccounts = {}
+		local success, err = pcall(function()
+			allAccounts = GetAllAccounts()
+		end)
+		
+		if not success then
+			print("❌ Error getting accounts: " .. tostring(err))
+			allAccounts = {}
+		else
+			print("✅ Got accounts, processing...")
+		end
+		
+		-- ДИАГНОСТИКА
+		print("=== /start command debug ===")
+		print("Current player gold: " .. currentGold)
+		
+		-- Правильно считаем количество аккаунтов (для таблиц с строковыми ключами)
+		local accountCount = 0
+		for _ in pairs(allAccounts) do
+			accountCount = accountCount + 1
+		end
+		print("Total accounts found: " .. tostring(accountCount))
+		
+		for playerName, accountData in pairs(allAccounts) do
+			print("  Player: " .. tostring(playerName) .. " | Gold: " .. tostring(accountData.raw_gold or 0))
+		end
+		
+		-- КОМПАКТНЫЙ ФОРМАТ
+		local msg = "🎮 *BoogaX Dashboard*\n\n"
+		
+		local totalAccounts = 0
+		local totalGold = 0
+		
+		for playerName, accountData in pairs(allAccounts) do
+			totalAccounts = totalAccounts + 1
+			totalGold = totalGold + (tonumber(accountData.raw_gold) or 0)
+		end
+		
+		msg = msg .. "📊 Аккаунтов: " .. totalAccounts .. " | 💰 Золота: " .. totalGold .. "\n\n"
+		
+		-- Сортируем аккаунты по золоту (больше → меньше)
+		local sortedAccounts = {}
+		for playerName, accountData in pairs(allAccounts) do
+			table.insert(sortedAccounts, {name = tostring(playerName), data = accountData})
+		end
+		table.sort(sortedAccounts, function(a, b)
+			return (tonumber(a.data.raw_gold) or 0) > (tonumber(b.data.raw_gold) or 0)
+		end)
+		
+		-- Выводим аккаунты компактно
+		for _, account in ipairs(sortedAccounts) do
+			local timeSince = os.time() - (tonumber(account.data.last_update) or 0)
+			local status = timeSince < 60 and "🟢" or (timeSince < 300 and "🟡" or "🔴")
+			local gold = tonumber(account.data.raw_gold) or 0
+			
+			msg = msg .. status .. " *" .. (account.data.player_name or account.name or "Unknown") .. "*\n"
+			msg = msg .. "   💰 " .. gold .. " gold\n"
+		end
+		
+		msg = msg .. "\n⏰ Время работы: " .. FormatUptime()
+		
+		-- ДОПОЛНИТЕЛЬНАЯ ДИАГНОСТИКА В СООБЩЕНИИ
+		print("=== Sending Telegram message ===")
+		print("Message length: " .. string.len(msg))
+		print("Message preview:\n" .. msg)
+		
+		-- Отправляем с обработкой ошибок
+		print("📤 Preparing to send response to chat " .. chatId)
+		print("   Bot token exists: " .. tostring(TELEGRAM_BOT_TOKEN ~= ""))
+		print("   Message length: " .. string.len(msg))
+		
+		-- Пробуем отправить без Markdown сначала (на случай проблем с форматированием)
+		local sendSuccess, sendErr = pcall(function()
+			-- Убираем Markdown форматирование для надежности
+			local plainMsg = msg:gsub("%*", ""):gsub("_", "") -- Убираем * и _
+			local url = "https://api.telegram.org/bot" .. TELEGRAM_BOT_TOKEN .. "/sendMessage?chat_id=" .. UrlEncode(chatId) .. "&text=" .. UrlEncode(plainMsg)
+			
+			print("   URL length: " .. string.len(url))
+			print("   Making HTTP request...")
+			
+			local success, response = MakeHttpRequest(url)
+			
+			print("   HTTP request completed. Success: " .. tostring(success))
+			
+			if success and response then
+				print("📡 Telegram API response: " .. string.sub(tostring(response), 1, 300))
+				if response:find('"ok":true') then
+					print("✅ Message sent successfully to chat " .. chatId)
+				else
+					print("❌ Telegram API returned error in response")
+					-- Пробуем найти описание ошибки
+					local errorDesc = response:match('"description":"([^"]+)"')
+					if errorDesc then
+						print("   Error description: " .. errorDesc)
+					end
+					print("Full response: " .. tostring(response))
+				end
+			else
+				print("❌ Failed to send message - HTTP request failed")
+				print("   Success: " .. tostring(success))
+				print("   Response type: " .. type(response))
+				if response then
+					print("   Response: " .. tostring(response))
+				end
+			end
+		end)
+		
+		if not sendSuccess then
+			print("❌ Error sending message (pcall failed): " .. tostring(sendErr))
+			-- Пробуем отправить простейшее сообщение для теста
+			pcall(function()
+				local testUrl = "https://api.telegram.org/bot" .. TELEGRAM_BOT_TOKEN .. "/sendMessage?chat_id=" .. UrlEncode(chatId) .. "&text=Test"
+				local testSuccess, testResponse = MakeHttpRequest(testUrl)
+				print("   Test message send result: " .. tostring(testSuccess))
+			end)
+		end
+	end
+end
+	
+	local function StartTelegramBot()
+		print("🔍 StartTelegramBot called")
+		print("   TELEGRAM_ENABLED: " .. tostring(TELEGRAM_ENABLED))
+		print("   TELEGRAM_BOT_TOKEN: " .. (TELEGRAM_BOT_TOKEN ~= "" and string.sub(TELEGRAM_BOT_TOKEN, 1, 10) .. "..." or "EMPTY"))
+		
+		if not TELEGRAM_ENABLED then 
+			print("❌ StartTelegramBot: Bot not enabled, exiting")
+			return 
+		end
+		
+		if TELEGRAM_BOT_TOKEN == "" then
+			print("❌ StartTelegramBot: Bot token is empty, exiting")
+			return
+		end
+		
+		-- Предотвращаем множественные запуски
+		if BOT_LOOP_RUNNING then
+			print("⚠️ StartTelegramBot: Bot loop already running, skipping...")
+			return
+		end
+		
+		BOT_LOOP_RUNNING = true
+		print("✅ StartTelegramBot: Starting bot loop...")
+		
+		-- Сбрасываем LAST_UPDATE_ID при первом запуске, чтобы получить все непрочитанные сообщения
+		-- Но сначала получаем последний update_id, чтобы не обрабатывать старые сообщения
+		task.spawn(function()
+			print("🔄 Getting last update ID to skip old messages...")
+			local testUrl = "https://api.telegram.org/bot" .. TELEGRAM_BOT_TOKEN .. "/getUpdates?offset=-1&limit=1"
+			local success, response = MakeHttpRequest(testUrl)
+			if success and response then
+				local decodeSuccess, data = pcall(function()
+					return HttpService:JSONDecode(response)
+				end)
+				if decodeSuccess and data and data.ok and data.result and #data.result > 0 then
+					local lastUpdateId = data.result[1].update_id
+					LAST_UPDATE_ID = lastUpdateId
+					print("✅ Last update ID: " .. LAST_UPDATE_ID .. " (old messages will be skipped)")
+				else
+					print("ℹ️ No previous updates found, starting from 0")
+					LAST_UPDATE_ID = 0
+				end
+			else
+				print("⚠️ Could not get last update ID, starting from 0")
+				LAST_UPDATE_ID = 0
+			end
+		end)
+		
+		-- Цикл проверки команд от Telegram
+		task.spawn(function()
+			-- Небольшая задержка, чтобы дать время получить последний update_id
+			task.wait(1)
+			print("🤖 StartTelegramBot: Bot loop started (LAST_UPDATE_ID: " .. LAST_UPDATE_ID .. ")")
+			local loopCount = 0
+			local conflictCount = 0
+			while TELEGRAM_ENABLED do
+				loopCount = loopCount + 1
+				
+				local updates = GetTelegramUpdates()
+				
+				-- Если получили обновления, сбрасываем счетчик конфликтов
+				if updates then
+					conflictCount = 0
+					if #updates > 0 then
+						print("📬 Processing " .. #updates .. " update(s)")
+						for _, update in ipairs(updates) do
+							if update.update_id then
+								LAST_UPDATE_ID = math.max(LAST_UPDATE_ID, update.update_id)
+								print("   Update ID: " .. update.update_id .. " (LAST_UPDATE_ID now: " .. LAST_UPDATE_ID .. ")")
+							end
+							if update.message then
+								pcall(function()
+									HandleTelegramCommand(update.message)
+								end)
+							end
+						end
+					end
+				else
+					-- Если updates = nil, возможно конфликт или другая ошибка
+					-- Увеличиваем счетчик и делаем паузу, если слишком много конфликтов подряд
+					conflictCount = conflictCount + 1
+					if conflictCount >= 5 then
+						-- Если 5 раз подряд конфликт, увеличиваем интервал проверки
+						task.wait(5) -- Ждем 5 секунд вместо 2
+						conflictCount = 0 -- Сбрасываем счетчик после паузы
+					end
+				end
+				
+				-- Логируем каждые 30 итераций (каждые 60 секунд при нормальной работе)
+				if loopCount % 30 == 0 then
+					print("🔄 Bot loop running... (iteration " .. loopCount .. ", LAST_UPDATE_ID: " .. LAST_UPDATE_ID .. ")")
+				end
+				
+				task.wait(2) -- Check every 2 seconds (или 5, если был конфликт)
+			end
+			BOT_LOOP_RUNNING = false
+			print("🛑 StartTelegramBot: Bot loop stopped")
+		end)
+		
+	-- Автоматическое обновление информации об аккаунте
+	task.spawn(function()
+		while TELEGRAM_ENABLED do
+			if TELEGRAM_CHAT_ID ~= "" then
+				UpdateAccountInfo()
+			end
+			
+			-- Синхронизируем список Chat ID из файла
+			local folderPath = "BoogaX"
+			local filePath = folderPath .. "/telegram.json"
+			pcall(function()
+				if readfile then
+					local content = readfile(filePath)
+					if content and content ~= "" then
+						local data = HttpService:JSONDecode(content)
+						TELEGRAM_CHAT_IDS = data.chat_ids or {}
+					end
+				end
+			end)
+			
+			task.wait(30) -- Обновляем каждые 30 секунд
+		end
+	end)
+	end
 
 -- Создание GUI с Fluent UI
-local Fluent = safeLoadStringFromUrl("https://github.com/1dontgiveaf/Fluent/releases/latest/download/main.lua")
+local Fluent = loadstring(game:HttpGet("https://github.com/1dontgiveaf/Fluent/releases/latest/download/main.lua"))()
 
-local SaveManager = safeLoadStringFromUrl("https://raw.githubusercontent.com/1dontgiveaf/Fluent/main/Addons/SaveManager.lua")
-local InterfaceManager = safeLoadStringFromUrl("https://raw.githubusercontent.com/1dontgiveaf/Fluent/main/Addons/InterfaceManager.lua")
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/1dontgiveaf/Fluent/main/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/1dontgiveaf/Fluent/main/Addons/InterfaceManager.lua"))()
 
 local Window = Fluent:CreateWindow({
     Title = "BoogaX Simple",
@@ -118,6 +1902,21 @@ SaveManager:SetFolder("BoogaXScriptHub/specific-game")
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 SaveManager:BuildConfigSection(Tabs.Settings)
 Window:SelectTab(1)
+
+	-- Load Telegram settings early
+	LoadTelegramSettings()
+	
+	-- Start Telegram bot if already enabled (нужен только токен, Chat ID не обязателен для обработки команд)
+	if TELEGRAM_ENABLED and TELEGRAM_BOT_TOKEN ~= "" then
+		print("🚀 Starting Telegram bot on load...")
+		StartTelegramBot()
+	else
+		if not TELEGRAM_ENABLED then
+			print("⚠️ Telegram bot not enabled")
+		elseif TELEGRAM_BOT_TOKEN == "" then
+			print("⚠️ Telegram bot token is empty")
+		end
+	end
 
 -- Функции создания элементов (адаптированы для Fluent UI с поддержкой вкладок)
 local function CreateToggle(name, default, callback, tab)
@@ -372,6 +2171,457 @@ end, Tabs.Movement)
 CreateToggle("Noclip", false, function(state)
 	ToggleNoclip(state)
 end, Tabs.Movement)
+
+-- ============================================
+-- VISUAL TAB
+-- ============================================
+-- ESP СИСТЕМА (ПЕРЕПИСАН С НУЛЯ)
+-- ============================================
+
+local function CreateESP(player)
+    if player == LocalPlayer then return end
+    if not ESP_ENABLED then return end
+    
+    local function UpdateESP()
+        if not player.Character then return end
+        
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+        local head = player.Character:FindFirstChild("Head")
+        if not hrp or not head then return end
+        
+        -- Удаляем старый ESP
+        for _, v in pairs(player.Character:GetChildren()) do
+            if v.Name == "ESPBox" or v.Name == "ESPText" then
+                v:Destroy()
+            end
+        end
+        
+        -- Создаем БОКС
+        local box = Instance.new("BoxHandleAdornment")
+        box.Name = "ESPBox"
+        box.Size = Vector3.new(4, 5, 1)
+        box.Adornee = hrp
+        box.AlwaysOnTop = true
+        box.ZIndex = 5
+        box.Transparency = 0.7
+        box.Color3 = Color3.fromRGB(255, 0, 0)
+        box.Parent = player.Character
+        
+        -- Создаем ТЕКСТ
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "ESPText"
+        billboard.Adornee = head
+        billboard.Size = UDim2.new(0, 200, 0, 50)
+        billboard.StudsOffset = Vector3.new(0, 2, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = player.Character
+        
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = player.Name
+        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameLabel.TextSize = 16
+        nameLabel.Font = Enum.Font.SourceSansBold
+        nameLabel.TextStrokeTransparency = 0.5
+        nameLabel.Parent = billboard
+        
+        local distLabel = Instance.new("TextLabel")
+        distLabel.Name = "Distance"
+        distLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        distLabel.Position = UDim2.new(0, 0, 0.5, 0)
+        distLabel.BackgroundTransparency = 1
+        distLabel.Text = "0m"
+        distLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        distLabel.TextSize = 14
+        distLabel.Font = Enum.Font.SourceSans
+        distLabel.TextStrokeTransparency = 0.5
+        distLabel.Parent = billboard
+        
+        -- Обновление расстояния в цикле
+        task.spawn(function()
+            while ESP_ENABLED and box.Parent do
+                task.wait(0.1)
+                
+                -- ИСПРАВЛЕНИЕ: проверяем что персонажи существуют
+                if player and player.Character and LocalPlayer and LocalPlayer.Character then
+                    local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local theirHRP = player.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if myHRP and theirHRP then
+                        local dist = (myHRP.Position - theirHRP.Position).Magnitude
+                        distLabel.Text = math.floor(dist) .. "m"
+                        
+                        -- Меняем цвет по расстоянию
+                        if dist < 50 then
+                            box.Color3 = Color3.fromRGB(255, 0, 0)
+                        elseif dist < 150 then
+                            box.Color3 = Color3.fromRGB(255, 255, 0)
+                        else
+                            box.Color3 = Color3.fromRGB(0, 255, 0)
+                        end
+                    end
+                end
+            end
+        end)
+    end
+    
+    -- Создаем ESP сейчас
+    UpdateESP()
+    
+    -- Пересоздаем при респавне
+    player.CharacterAdded:Connect(function()
+        if ESP_ENABLED then
+            task.wait(1)
+            UpdateESP()
+        end
+    end)
+end
+
+local function RemoveESP(player)
+    if player.Character then
+        for _, v in pairs(player.Character:GetChildren()) do
+            if v.Name == "ESPBox" or v.Name == "ESPText" then
+                v:Destroy()
+            end
+        end
+    end
+end
+
+local function RemoveAllESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        RemoveESP(player)
+    end
+end
+
+CreateToggle("ESP Players", false, function(state)
+    ESP_ENABLED = state
+    
+    if state then
+        -- Включаем ESP для всех игроков
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                CreateESP(player)
+            end
+        end
+        
+        -- Автоматически добавляем ESP новым игрокам
+        ESPPlayersConnection = Players.PlayerAdded:Connect(function(player)
+            if player ~= LocalPlayer then
+                task.wait(1)
+                CreateESP(player)
+            end
+        end)
+    else
+        -- Выключаем ESP
+        if ESPPlayersConnection then
+            ESPPlayersConnection:Disconnect()
+            ESPPlayersConnection = nil
+        end
+        
+        RemoveAllESP()
+    end
+end, Tabs.Visual)
+
+-- Автоматическое удаление при выходе игрока
+Players.PlayerRemoving:Connect(function(player)
+    RemoveESP(player)
+end)
+
+-- ============================================
+-- ESP Gold Node
+-- ============================================
+local GOLD_ESP_ENABLED = false
+local GoldESPConnection = nil
+local goldESPObjects = {}
+
+local function CreateGoldESP(goldNode)
+    if not goldNode or not goldNode.Parent then return end
+    if not GOLD_ESP_ENABLED then return end
+    
+    -- Проверяем, не создан ли уже ESP для этого объекта
+    if goldESPObjects[goldNode] then return end
+    
+    local primaryPart = goldNode:IsA("Model") and (goldNode.PrimaryPart or goldNode:FindFirstChildWhichIsA("BasePart")) or goldNode
+    if not primaryPart then return end
+    
+    -- Создаем БОКС для золота
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "GoldESPBox"
+    box.Size = primaryPart.Size + Vector3.new(0.5, 0.5, 0.5)
+    box.Adornee = primaryPart
+    box.AlwaysOnTop = true
+    box.ZIndex = 5
+    box.Transparency = 0.6
+    box.Color3 = Color3.fromRGB(255, 215, 0) -- Золотой цвет
+    box.Parent = primaryPart
+    
+    -- Создаем ТЕКСТ над золотом
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "GoldESPText"
+    billboard.Adornee = primaryPart
+    billboard.Size = UDim2.new(0, 150, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, primaryPart.Size.Y / 2 + 2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = primaryPart
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = "💰 Gold Ore"
+    nameLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+    nameLabel.TextSize = 14
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextStrokeTransparency = 0.3
+    nameLabel.Parent = billboard
+    
+    local distLabel = Instance.new("TextLabel")
+    distLabel.Name = "Distance"
+    distLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    distLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    distLabel.BackgroundTransparency = 1
+    distLabel.Text = "0m"
+    distLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    distLabel.TextSize = 12
+    distLabel.Font = Enum.Font.Gotham
+    distLabel.TextStrokeTransparency = 0.3
+    distLabel.Parent = billboard
+    
+    -- Сохраняем ссылки
+    goldESPObjects[goldNode] = {box = box, billboard = billboard}
+    
+    -- Обновление расстояния в цикле
+    task.spawn(function()
+        while GOLD_ESP_ENABLED and box.Parent and goldNode.Parent do
+            task.wait(0.2)
+            
+            if LocalPlayer and LocalPlayer.Character then
+                local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                
+                if myHRP and primaryPart then
+                    local dist = (myHRP.Position - primaryPart.Position).Magnitude
+                    distLabel.Text = math.floor(dist) .. "m"
+                    
+                    -- Меняем цвет по расстоянию
+                    if dist < 30 then
+                        box.Color3 = Color3.fromRGB(255, 0, 0) -- Красный (очень близко)
+                        nameLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+                    elseif dist < 80 then
+                        box.Color3 = Color3.fromRGB(255, 215, 0) -- Золотой (средне)
+                        nameLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+                    else
+                        box.Color3 = Color3.fromRGB(0, 255, 0) -- Зеленый (далеко)
+                        nameLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+                    end
+                end
+            end
+        end
+        
+        -- Очистка при завершении
+        if goldESPObjects[goldNode] then
+            goldESPObjects[goldNode] = nil
+        end
+    end)
+end
+
+local function RemoveGoldESP(goldNode)
+    if goldESPObjects[goldNode] then
+        local espData = goldESPObjects[goldNode]
+        if espData.box then pcall(function() espData.box:Destroy() end) end
+        if espData.billboard then pcall(function() espData.billboard:Destroy() end) end
+        goldESPObjects[goldNode] = nil
+    end
+end
+
+local function RemoveAllGoldESP()
+    for goldNode, espData in pairs(goldESPObjects) do
+        if espData.box then pcall(function() espData.box:Destroy() end) end
+        if espData.billboard then pcall(function() espData.billboard:Destroy() end) end
+    end
+    goldESPObjects = {}
+end
+
+local function UpdateGoldESP()
+    if not GOLD_ESP_ENABLED then return end
+    
+    local resourcesFolder = workspace:FindFirstChild("Resources")
+    if not resourcesFolder then return end
+    
+    -- Ищем все золотые ноды
+    for _, resource in ipairs(resourcesFolder:GetChildren()) do
+        if resource:IsA("Model") then
+            local name = resource.Name:lower()
+            -- Проверяем, является ли это золотом
+            if name:match("[Gg]old") or name:match("[Oo]re") then
+                CreateGoldESP(resource)
+            end
+        end
+    end
+end
+
+CreateToggle("ESP Gold Node", false, function(state)
+    GOLD_ESP_ENABLED = state
+    
+    if state then
+        -- Включаем ESP для всех золотых нодов
+        UpdateGoldESP()
+        
+        -- Автоматически обновляем ESP каждые 5 секунд
+        GoldESPConnection = task.spawn(function()
+            while GOLD_ESP_ENABLED do
+                task.wait(5)
+                UpdateGoldESP()
+            end
+        end)
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Gold ESP Enabled",
+            Text = "Gold nodes are now highlighted!",
+            Duration = 3
+        })
+    else
+        -- Выключаем ESP
+        if GoldESPConnection then
+            task.cancel(GoldESPConnection)
+            GoldESPConnection = nil
+        end
+        
+        RemoveAllGoldESP()
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Gold ESP Disabled",
+            Text = "Gold ESP turned off",
+            Duration = 2
+        })
+    end
+end, Tabs.Visual)
+
+-- Night Vision
+CreateToggle("Night Vision", false, function(state)
+    NIGHT_VISION_ENABLED = state
+    if state then
+        Lighting.Ambient = Color3.new(1, 1, 1)
+        Lighting.Brightness = 2
+        Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+    else
+        Lighting.Ambient = defaultLighting.Ambient
+        Lighting.Brightness = defaultLighting.Brightness
+        Lighting.OutdoorAmbient = defaultLighting.OutdoorAmbient
+    end
+end, Tabs.Visual)
+
+-- Glow (Оптимизировано с автоматическим обновлением)
+local function UpdateGlow()
+    if not GLOW_ENABLED then return end
+    local char = LocalPlayer.Character
+    if char then
+        if GlowHighlight then 
+            GlowHighlight:Destroy() 
+        end
+        GlowHighlight = Instance.new("Highlight")
+        GlowHighlight.FillColor = Color3.fromRGB(100, 100, 255)
+        GlowHighlight.OutlineColor = Color3.fromRGB(100, 100, 255)
+        GlowHighlight.FillTransparency = 0.5
+        GlowHighlight.Adornee = char
+        GlowHighlight.Parent = char
+    end
+end
+
+CreateToggle("Character Glow", false, function(state)
+    GLOW_ENABLED = state
+    
+    -- Отключаем предыдущее соединение
+    if GlowCharacterConnection then
+        GlowCharacterConnection:Disconnect()
+        GlowCharacterConnection = nil
+    end
+    
+    if state then
+        UpdateGlow()
+        
+        -- Автоматическое обновление при спавне нового персонажа
+        GlowCharacterConnection = LocalPlayer.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            UpdateGlow()
+        end)
+    else
+        if GlowHighlight then
+            GlowHighlight:Destroy()
+            GlowHighlight = nil
+        end
+    end
+end, Tabs.Visual)
+
+-- Hitboxes (Оптимизировано с автоматическим обновлением)
+local function CreateHitbox(player)
+    if not HITBOXES_ENABLED or player == LocalPlayer then return end
+    if player.Character then
+        local root = player.Character:WaitForChild("HumanoidRootPart", 5)
+        if root then
+            local existingHitbox = HITBOX_HOLDER:FindFirstChild("Hitbox_" .. player.Name)
+            if existingHitbox then existingHitbox:Destroy() end
+            
+            local box = Instance.new("BoxHandleAdornment")
+            box.Name = "Hitbox_" .. player.Name
+            box.Adornee = root
+            box.Size = Vector3.new(6, 8, 6)
+            box.Transparency = 0.8
+            box.Color3 = Color3.fromRGB(255, 200, 0)
+            box.AlwaysOnTop = true
+            box.Parent = HITBOX_HOLDER
+        end
+    end
+end
+
+local function RemoveHitbox(player)
+    local hitbox = HITBOX_HOLDER:FindFirstChild("Hitbox_" .. player.Name)
+    if hitbox then hitbox:Destroy() end
+end
+
+CreateToggle("Hitboxes", false, function(state)
+    HITBOXES_ENABLED = state
+    
+    -- Отключаем предыдущее соединение
+    if HitboxesPlayersConnection then
+        HitboxesPlayersConnection:Disconnect()
+        HitboxesPlayersConnection = nil
+    end
+    
+    if state then
+        -- Создаём Hitboxes для всех существующих игроков
+        for _, player in ipairs(Players:GetPlayers()) do
+            CreateHitbox(player)
+        end
+        
+        -- Автоматическое обновление при добавлении игроков
+        HitboxesPlayersConnection = Players.PlayerAdded:Connect(function(player)
+            CreateHitbox(player)
+            
+            -- Обновление при спавне персонажа
+            player.CharacterAdded:Connect(function()
+                task.wait(0.5)
+                CreateHitbox(player)
+            end)
+        end)
+        
+        -- Обработка существующих игроков
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                player.CharacterAdded:Connect(function()
+                    task.wait(0.5)
+                    CreateHitbox(player)
+                end)
+            end
+        end
+    else
+        HITBOX_HOLDER:ClearAllChildren()
+    end
+end, Tabs.Visual)
+
+-- Автоматическое удаление при выходе игрока
+Players.PlayerRemoving:Connect(function(player)
+    RemoveHitbox(player)
+end)
 
 -- Waypoints System
 local WAYPOINTS_MOVING = false
@@ -1030,6 +3280,188 @@ end, Tabs.Waypoints)
 CreateSlider("Flight Speed", 10, 100, 30, function(value)
     FLY_SPEED = value
 end, Tabs.Waypoints)
+
+-- ============================================
+-- Auto Farm Crystal
+-- ============================================
+
+local function FindNearestCrystalLode()
+	local player = game:GetService("Players").LocalPlayer
+	if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+		return nil
+	end
+	
+	local rootPart = player.Character.HumanoidRootPart
+	local nearestCrystal = nil
+	local nearestDistance = math.huge
+	
+	-- Ищем Crystal Lode в Workspace
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("Model") or obj:IsA("Part") then
+			local name = obj.Name:lower()
+			-- Ищем кристаллы (разные варианты названий)
+			if name:find("crystal") and (name:find("lode") or name:find("rock") or name:find("ore")) then
+				-- Пропускаем помеченные кристаллы
+				if not obj:FindFirstChild("_SkipMarker") then
+					local crystalPos = obj:IsA("Model") and obj:GetModelCFrame().Position or obj.Position
+					local distance = (rootPart.Position - crystalPos).Magnitude
+					
+					-- Игнорируем слишком далёкие кристаллы
+					if distance < 500 and distance < nearestDistance then
+						nearestDistance = distance
+						nearestCrystal = obj
+					end
+				end
+			end
+		end
+	end
+	
+	return nearestCrystal, nearestDistance
+end
+
+local currentCrystalHighlight = nil
+
+local function StartCrystalFarm()
+	if CRYSTAL_FARM_RUNNING then return end
+	
+	CRYSTAL_FARM_RUNNING = true
+	
+	game:GetService("StarterGui"):SetCore("SendNotification", {
+		Title = "BoogaX",
+		Text = "🔷 Crystal Farm Started!",
+		Duration = 3
+	})
+	
+	task.spawn(function()
+		local player = game:GetService("Players").LocalPlayer
+		local currentCrystal = nil
+		local arrivalTime = 0
+		local maxWaitTime = 15 -- Максимум 15 секунд ждать около кристалла
+		
+		while CRYSTAL_FARM_ENABLED and CRYSTAL_FARM_RUNNING do
+			local char = player.Character
+			if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
+				local humanoid = char.Humanoid
+				local rootPart = char.HumanoidRootPart
+				
+				-- Если текущего кристалла нет или он далеко/удалён, ищем новый
+				if not currentCrystal or not currentCrystal.Parent or (rootPart.Position - (currentCrystal:IsA("Model") and currentCrystal:GetModelCFrame().Position or currentCrystal.Position)).Magnitude > 100 then
+					-- Убираем старую подсветку
+					if currentCrystalHighlight then
+						currentCrystalHighlight:Destroy()
+						currentCrystalHighlight = nil
+					end
+					
+					currentCrystal, _ = FindNearestCrystalLode()
+					arrivalTime = 0
+					
+					-- Добавляем подсветку к новому кристаллу
+					if currentCrystal and currentCrystal.Parent then
+						pcall(function()
+							local highlight = Instance.new("Highlight")
+							highlight.FillColor = Color3.fromRGB(0, 255, 255)
+							highlight.OutlineColor = Color3.fromRGB(0, 150, 255)
+							highlight.FillTransparency = 0.5
+							highlight.OutlineTransparency = 0
+							highlight.Parent = currentCrystal
+							currentCrystalHighlight = highlight
+						end)
+					end
+				end
+				
+				if currentCrystal and currentCrystal.Parent then
+					local crystalPos = currentCrystal:IsA("Model") and currentCrystal:GetModelCFrame().Position or currentCrystal.Position
+					local distance = (rootPart.Position - crystalPos).Magnitude
+					
+					if distance > 5 then
+						-- Идём к кристаллу
+						humanoid:MoveTo(crystalPos)
+						arrivalTime = 0
+					else
+						-- Мы у кристалла
+						if arrivalTime == 0 then
+							arrivalTime = tick()
+							game:GetService("StarterGui"):SetCore("SendNotification", {
+								Title = "BoogaX",
+								Text = "🔷 Near crystal! Waiting for you to break it...",
+								Duration = 3
+							})
+						end
+						
+						-- Проверяем сколько времени мы тут стоим
+						local waitedTime = tick() - arrivalTime
+						
+						-- Если кристалл не сломали за maxWaitTime секунд, ищем следующий
+						if waitedTime > maxWaitTime then
+							game:GetService("StarterGui"):SetCore("SendNotification", {
+								Title = "BoogaX",
+								Text = "⏩ Skipping this crystal...",
+								Duration = 2
+							})
+							-- Помечаем как "пропущенный" временно
+							local tempMarker = Instance.new("BoolValue")
+							tempMarker.Name = "_SkipMarker"
+							tempMarker.Parent = currentCrystal
+							task.delay(60, function() -- Через минуту можно вернуться
+								if tempMarker and tempMarker.Parent then
+									tempMarker:Destroy()
+								end
+							end)
+							currentCrystal = nil
+							arrivalTime = 0
+						end
+					end
+				else
+					-- Кристаллов не найдено
+					game:GetService("StarterGui"):SetCore("SendNotification", {
+						Title = "BoogaX",
+						Text = "🔍 Searching for crystals...",
+						Duration = 3
+					})
+					task.wait(5)
+				end
+			end
+			
+			task.wait(0.5)
+		end
+		
+		-- Убираем подсветку при остановке
+		if currentCrystalHighlight then
+			currentCrystalHighlight:Destroy()
+			currentCrystalHighlight = nil
+		end
+		
+		game:GetService("StarterGui"):SetCore("SendNotification", {
+			Title = "BoogaX",
+			Text = "🔷 Crystal Farm Stopped!",
+			Duration = 3
+		})
+	end)
+end
+
+local function StopCrystalFarm()
+	CRYSTAL_FARM_RUNNING = false
+	
+	-- Убираем подсветку
+	if currentCrystalHighlight then
+		currentCrystalHighlight:Destroy()
+		currentCrystalHighlight = nil
+	end
+end
+
+-- ============================================
+-- AUTO FARM TAB
+-- ============================================
+-- UI для Crystal Farm
+CreateToggle("Auto Farm Crystal", false, function(state)
+	CRYSTAL_FARM_ENABLED = state
+	
+	if state then
+		StartCrystalFarm()
+	else
+		StopCrystalFarm()
+	end
+end, Tabs.AutoFarm)
 
 -- ============================================
 -- Auto Farm Gold
@@ -2565,6 +4997,185 @@ CreateToggle("Auto Break", false, function(state)
 	end
 end, Tabs.AutoFarm)
 
+	-- ============================================
+	-- Telegram Bot Integration
+	-- ============================================
+
+	local function CreateTelegramSection()
+		Tabs.Main:AddParagraph({
+			Title = "📨 Telegram Notifier",
+			Content = "Настройка Telegram уведомлений"
+		})
+
+		local tokenInput = CreateInput("Bot Token", "123456:ABC-DEF...", TELEGRAM_BOT_TOKEN, function(text)
+			TELEGRAM_BOT_TOKEN = tostring(text or "")
+			SaveTelegramSettings()
+		end)
+
+		local chatInput = CreateInput("Chat ID", "e.g. 123456789", TELEGRAM_CHAT_ID, function(text)
+			TELEGRAM_CHAT_ID = tostring(text or "")
+			SaveTelegramSettings()
+		end)
+
+		local enabledToggle = CreateToggle("Enable Telegram notifications", TELEGRAM_ENABLED, function(state)
+			TELEGRAM_ENABLED = state
+			SaveTelegramSettings()
+			if state and TELEGRAM_BOT_TOKEN ~= "" then
+				-- Start bot to listen for commands (нужен только токен)
+				StartTelegramBot()
+				-- Отправляем уведомление только если есть Chat ID
+				if TELEGRAM_CHAT_ID ~= "" then
+					local rawGold = GetRawGoldAmount()
+					SendTelegramMessage("✅ Notifications enabled. Raw Gold: " .. tostring(rawGold))
+				else
+					print("ℹ️ Bot started, but no Chat ID set. Bot will respond to /start commands.")
+				end
+			end
+		end)
+
+
+
+		local checkTokenBtn = CreateButton("1️⃣ Check Bot Token", function()
+			local ok, msg = CheckBotToken()
+			print("Token check result:", ok, msg)
+			Fluent:Notify({
+				Title = "Bot Token Check",
+				Content = msg,
+				Duration = 5
+			})
+		end)
+
+	-- Кнопка для тестирования получения обновлений
+	local testUpdatesBtn = CreateButton("🔍 Test Get Updates", function()
+		print("🧪 Testing GetTelegramUpdates...")
+		if not TELEGRAM_ENABLED then
+			print("❌ Bot is not enabled!")
+			game:GetService("StarterGui"):SetCore("SendNotification", {
+				Title = "Test Updates",
+				Text = "❌ Bot is not enabled!",
+				Duration = 3
+			})
+			return
+		end
+		if TELEGRAM_BOT_TOKEN == "" then
+			print("❌ Bot token is empty!")
+			game:GetService("StarterGui"):SetCore("SendNotification", {
+				Title = "Test Updates",
+				Text = "❌ Bot token is empty!",
+				Duration = 3
+			})
+			return
+		end
+		local updates = GetTelegramUpdates()
+		if updates then
+			local msg = "✅ Got " .. #updates .. " update(s)"
+			print(msg)
+			game:GetService("StarterGui"):SetCore("SendNotification", {
+				Title = "Test Updates",
+				Text = msg,
+				Duration = 3
+			})
+		else
+			print("❌ No updates received")
+			game:GetService("StarterGui"):SetCore("SendNotification", {
+				Title = "Test Updates",
+				Text = "❌ No updates received (check console for details)",
+				Duration = 3
+			})
+		end
+	end)
+	if testUpdatesBtn then testUpdatesBtn.LayoutOrder = 11.5 end
+
+	local getChatIdBtn = CreateButton("2️⃣ Get My Chat ID (send /start to bot first!)", function()
+		local chatId, msg = GetChatIdFromUpdates()
+		print("Chat ID result:", chatId, msg)
+		
+		if chatId then
+			TELEGRAM_CHAT_ID = chatId
+			SaveTelegramSettings()
+			
+			-- Обновляем поле ввода
+			if chatInput then
+				if chatInput.SetValue then
+					chatInput:SetValue(chatId)
+				elseif Options and Options.ChatID then
+					Options.ChatID:SetValue(chatId)
+				end
+			end
+			
+			-- ✅ АВТОМАТИЧЕСКОЕ КОПИРОВАНИЕ В БУФЕР ОБМЕНА
+			local copied = false
+			pcall(function()
+				if setclipboard then
+					setclipboard(tostring(chatId))
+					copied = true
+				elseif toclipboard then
+					toclipboard(tostring(chatId))
+					copied = true
+				end
+			end)
+			
+			-- Улучшенное уведомление
+			game:GetService("StarterGui"):SetCore("SendNotification", {
+				Title = "✅ Chat ID Получен!",
+				Text = "ID: " .. chatId .. (copied and "\n📋 Скопировано в буфер обмена!" or "\n⚠️ Не удалось скопировать"),
+				Duration = 7
+			})
+			
+			print("✅ Chat ID успешно получен: " .. chatId)
+			if copied then
+				print("📋 Chat ID скопирован в буфер обмена!")
+			end
+		else
+			game:GetService("StarterGui"):SetCore("SendNotification", {
+				Title = "❌ Ошибка",
+				Text = msg or "Не удалось получить Chat ID\nОтправь /start боту в Telegram!",
+				Duration = 7
+			})
+			print("❌ Ошибка получения Chat ID:", msg)
+		end
+	end)
+	if getChatIdBtn then getChatIdBtn.LayoutOrder = 12 end
+
+	local testBtn = CreateButton("3️⃣ Send Test Message", function()
+		local rawGold = GetRawGoldAmount()
+		local ok = SendTelegramMessage("🔔 Test message from BoogaX. Gold: " .. tostring(rawGold))
+		game:GetService("StarterGui"):SetCore("SendNotification", {
+			Title = "BoogaX",
+			Text = ok and "Test message sent!" or "Failed - check console for details",
+			Duration = 3
+		})
+	end)
+		if testBtn then testBtn.LayoutOrder = 13 end
+		
+		-- Инструкция
+		Tabs.Main:AddParagraph({
+			Title = "📝 Как настроить",
+			Content = "1. Создай бота через @BotFather\n2. Скопируй токен, вставь выше\n3. Нажми 'Check Bot Token'\n4. Отправь /start боту в Telegram\n5. Нажми 'Get My Chat ID'\n6. Включи notifications\n\n📋 Команды бота:\n/start - Покажет сколько Raw Gold в инвентаре"
+		})
+	end
+
+	-- Build Telegram section at the end
+	CreateTelegramSection()
+
+-- УЛУЧШЕННОЕ: Многострочное текстовое поле для координат
+-- Используем AddInput с большим лимитом символов
+local coordsTextBox = Tabs.Coordinates:AddInput("CoordinatesInput", {
+    Title = "Coordinates (Paste JSON here)",
+    Default = "",
+    Placeholder = "Paste full JSON here (supports long text)",
+    Numeric = false,
+    Finished = false,
+    MultiLine = true, -- Многострочный режим
+    Lines = 5, -- 5 строк видимых
+    Callback = function(value)
+        -- Сохраняем значение
+        if value and value ~= "" then
+            print("📝 Coordinates pasted: " .. string.len(value) .. " characters")
+        end
+    end
+})
+
 -- Функция для загрузки координат из текста (выделена отдельно для повторного использования)
 function LoadCoordinatesFromText(coordsText)
     -- УЛУЧШЕННАЯ ОЧИСТКА ТЕКСТА (для файлов с телефона)
@@ -3875,6 +6486,21 @@ end -- Конец функции CreateMainGUI()
 local originalAddHWID = nil
 local originalPastebin = nil
 
+-- Показываем GUI авторизации только если не авторизован
+if HWID_CHECK_ENABLED and not hwidAuthorized then
+    -- Ждём немного чтобы GUI успел загрузиться
+    task.wait(0.5)
+    CreateHWIDAuthGUI()
+    --print("⚠️ HWID Authorization Required - GUI shown")
+    
+    -- Обновляем логику кнопок в GUI авторизации
+    -- Нужно переопределить функции после создания GUI
+    task.wait(0.1)
+    -- Переопределение будет в самой функции CreateHWIDAuthGUI
+else
+    -- HWID авторизован, создаём основной GUI сразу
+    --print("✓ HWID Check Passed - Creating main GUI...")
+    
     -- Диагностика HTTP методов
     print("=== HTTP Methods Diagnostic ===")
     if http_request then print("✓ http_request available") else print("✗ http_request NOT available") end
