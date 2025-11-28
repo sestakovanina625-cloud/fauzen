@@ -1,3 +1,37 @@
+
+-- =============================
+-- FIXES / DEFAULT DEFINITIONS
+-- =============================
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+
+-- Player
+local LocalPlayer = Players.LocalPlayer
+
+-- Default movement values (safe fallbacks)
+local BASE_WALK_SPEED = 16
+local MAX_WALK_SPEED = 100
+local CurrentWalkSpeed = BASE_WALK_SPEED
+
+-- Feature flags (defaults)
+local NOCLIP_ENABLED = false
+local MOUNTAIN_CLIMBER_ENABLED = false
+local WAYPOINTS_ENABLED = false
+
+-- Safety: clipboard
+if not setclipboard then
+    setclipboard = function() end
+end
+
+-- =============================
+-- END FIXES
+-- =============================
+
+
 -- BoogaX Simple Working GUI
 -- Простой и рабочий интерфейс
 -- 
